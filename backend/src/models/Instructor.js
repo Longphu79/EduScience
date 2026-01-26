@@ -9,6 +9,16 @@ const instructorSchema = new mongoose.Schema(
       unique: true,
     },
 
+    name: {
+      type: String,
+      required: true,
+    },
+
+    avatarUrl: {
+      type: String,
+      default: "",
+    },
+
     bio: {
       type: String,
       default: "",

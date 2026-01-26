@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import authRoute from "./routes/auth.route.js";
+import courseRoute from "./routes/course.route.js";
 import dotenv from 'dotenv';
 import { connectDatabase } from './config/Database.js';
 
@@ -12,6 +13,7 @@ connectDatabase();
 
 // routes
 app.use("/auth", authRoute);
+app.use("/courses", courseRoute);
 
 
 // test route
