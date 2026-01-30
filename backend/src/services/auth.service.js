@@ -27,7 +27,7 @@ const user = await User.create({
   });
 
     if (role === 'instructor') {
-        await Instructor.create({ userId: user._id });
+        await Instructor.create({ userId: user._id, name: username });
     }
 
     if (role === 'student') {
