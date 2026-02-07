@@ -54,7 +54,7 @@ export function Footer() {
                         <h3>About Us</h3>
                         <div className="space-y-2 text-primary-foreground/80">
                             <a
-                                href="#"
+                                href="/aboutus"
                                 className="block hover:text-primary-foreground transition-colors"
                             >
                                 About

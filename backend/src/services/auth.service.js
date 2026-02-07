@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import User from '../models/user.js';
 import Instructor from '../models/Instructor.js';
 import Student from '../models/Student.js';
 import { signToken } from '../config/jwt.js';
@@ -9,8 +9,8 @@ import { signToken } from '../config/jwt.js';
 export const register = async ({ username, email, password, role }) => {
     const existingUser = await User.findOne({
     $or: [
-      { username: username.toLowerCase() },
-      { email: email?.toLowerCase() },
+      { username: username},
+      { email: email},
     ],
   });
     if (existingUser) {
@@ -20,8 +20,8 @@ export const register = async ({ username, email, password, role }) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
 const user = await User.create({
-    username: username.toLowerCase(),
-    email: email?.toLowerCase(),
+    username: username,
+    email: email,
     password: hashedPassword,
     role,
   });
@@ -34,6 +34,10 @@ const user = await User.create({
         await Student.create({ userId: user._id });
     }
 
+    if (role === "admin") {
+        await Admin.create({ userId: user._id, name: username });
+    } 
+
     const token = signToken({ userId: user._id, role: user.role });
     return { user, token };
 }
@@ -44,9 +48,11 @@ export const login = async ({ username, password }) => {
     throw new Error("Username and password are required");
   }
 
-const user = await User.findOne({
-  username: username.toLowerCase(),
-}).select("+password");
+ const user = await User.findOne({
+  username: username?.toLowerCase(),
+ }).select("+password");
+
+
 
 
   if (!user) {

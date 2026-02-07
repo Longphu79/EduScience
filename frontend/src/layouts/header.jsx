@@ -28,10 +28,10 @@ export function Header() {
                         Features
                     </Link>
                     <Link
-                        to="pricing"
+                        to="courses"
                         className="text-gray-600 hover:text-black"
                     >
-                        Pricing
+                        courses
                     </Link>
                     <Link
                         to="testimonials"

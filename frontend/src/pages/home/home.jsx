@@ -7,7 +7,7 @@ function Home() {
     const [course, setCourses] = useState([]);
 
     useEffect(() => {
-        fetch("http://localhost:4000/courses/popular")
+        fetch("http://localhost:4000/course/popular")
             .then((res) => res.json())
             .then((data) => setCourses(data))
             .catch((err) => console.log(err));
