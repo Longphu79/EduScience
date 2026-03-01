@@ -3,6 +3,7 @@ import cors from "cors";
 import authRoute from "./routes/auth.route.js";
 import courseRoute from "./routes/course.route.js";
 import userRoute from "./routes/user.route.js"
+import cartRoutes from "./routes/cart.route.js";
 import dotenv from 'dotenv';
 import { connectDatabase } from './config/Database.js';
 
@@ -16,7 +17,7 @@ connectDatabase();
 app.use("/auth", authRoute);
 app.use("/course", courseRoute);
 app.use("/user", userRoute );
-
+app.use("/api/cart", cartRoutes);
 
 // test route
 app.get('/', (req, res) => {
