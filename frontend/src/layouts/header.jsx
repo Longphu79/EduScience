@@ -31,7 +31,7 @@ export function Header() {
                         to="courses"
                         className="text-gray-600 hover:text-black"
                     >
-                        courses
+                        Courses
                     </Link>
                     <Link
                         to="testimonials"
