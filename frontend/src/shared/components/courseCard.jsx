@@ -1,6 +1,30 @@
 import { RatingStars } from "./ratingStars.jsx";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "../../features/cart/state/cartContext.jsx";
+import { useWishlist } from "../../features/wishlist/state/wishListContext.jsx";
 
 export function CourseCard({ course }) {
+    const navigate = useNavigate();
+    const { addToCart } = useCart();
+    const { addToWishlist } = useWishlist();
+
+    const handleEnroll = async () => {
+        try {
+            await addToCart(course._id);
+            navigate("/cart");
+        } catch (err) {
+            console.error("Add to cart failed:", err);
+        }
+    };
+
+    const handleWishlist = async () => {
+        try {
+            await addToWishlist(course._id);
+        } catch (err) {
+            console.error("Add wishlist failed:", err);
+        }
+    };
+
     return (
         <div className="relative bg-gray-100 rounded-lg border border-violet-600 overflow-hidden h-full flex flex-col">
             {/* Thumbnail */}
@@ -27,6 +51,7 @@ export function CourseCard({ course }) {
                 <span className="text-violet-600 font-medium mb-2">
                     {course.price === 0 ? "Free" : `$${course.price}`}
                 </span>
+
                 <h3 className="text-sky-950 font-semibold text-lg leading-snug line-clamp-2 mb-4 min-h-[3.5rem]">
                     {course.title}
                 </h3>
@@ -49,9 +74,23 @@ export function CourseCard({ course }) {
                         </span>
                     </div>
 
-                    <button className="bg-violet-600 text-white px-4 py-2 rounded hover:bg-violet-700 transition">
-                        Enroll
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {/* Wishlist button */}
+                        <button
+                            onClick={handleWishlist}
+                            className="w-10 h-10 flex items-center justify-center rounded-full bg-violet-600 text-white hover:bg-violet-700 transition shadow"
+                        >
+                            ♥
+                        </button>
+
+                        {/* Enroll button */}
+                        <button
+                            onClick={handleEnroll}
+                            className="bg-violet-600 text-white px-4 py-2 rounded hover:bg-violet-700 transition"
+                        >
+                            Enroll
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

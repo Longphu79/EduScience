@@ -4,6 +4,9 @@ import Login from "./pages/auth/Login.jsx";
 import Register from "./pages/auth/Register.jsx";
 import Home from "./pages/home/home.jsx";
 import About from "./pages/aboutus/about.jsx";
+import Cart from "./pages/cart/cart.jsx";
+import AllCoursesPage from "./pages/course/AllCoursesPage.jsx";
+import Wishlist from "./pages/wishlist/wishlist.jsx";
 import { Features } from "./pages/home/features.jsx";
 
 function App() {
@@ -14,7 +17,10 @@ function App() {
                 <Route element={<MainLayout />}>
                     <Route path="/" element={<Home />} />
                     <Route path="/features" element={<Features />} />
+                    <Route path="/courses" element={<AllCoursesPage />} />
                     <Route path="/aboutus" element={<About />} />
+                    <Route path="/wishlist" element={<Wishlist />} />
+                    <Route path="/cart" element={<Cart />} />
                 </Route>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
