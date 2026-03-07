@@ -5,15 +5,18 @@ import "./shared/styles/index.css";
 import AuthProvider from "./features/auth/state/authProvider";
 import { CartProvider } from "./features/cart/state/CartProvider.jsx";
 import { WishlistProvider } from "./features/wishlist/state/wishListProvider.jsx";
+import { UserProvider } from "./features/user/state/userProvider.jsx";
 
 createRoot(document.getElementById("root")).render(
     <StrictMode>
         <AuthProvider>
-            <CartProvider>
-                <WishlistProvider>
-                    <App />
-                </WishlistProvider>
-            </CartProvider>
+            <UserProvider>
+                <CartProvider>
+                    <WishlistProvider>
+                        <App />
+                    </WishlistProvider>
+                </CartProvider>
+            </UserProvider>
         </AuthProvider>
     </StrictMode>,
 );

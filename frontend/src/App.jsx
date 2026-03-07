@@ -7,6 +7,7 @@ import About from "./pages/aboutus/about.jsx";
 import Cart from "./pages/cart/cart.jsx";
 import AllCoursesPage from "./pages/course/AllCoursesPage.jsx";
 import Wishlist from "./pages/wishlist/wishlist.jsx";
+import ProfilePage from "./pages/profile/ProfilePage.jsx";
 import { Features } from "./pages/home/features.jsx";
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
                     <Route path="/aboutus" element={<About />} />
                     <Route path="/wishlist" element={<Wishlist />} />
                     <Route path="/cart" element={<Cart />} />
+                    <Route path="/profile" element={<ProfilePage />} />
                 </Route>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />

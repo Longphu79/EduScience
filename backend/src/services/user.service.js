@@ -2,7 +2,7 @@ import User from "../models/user.js";
 import bcrypt from "bcryptjs";
 import Student from "../models/Student.js";
 import Instructor from "../models/Instructor.js";
-
+import mongoose from "mongoose";
 
 export const getUserById = async (userId) => {
     return await User.findById(userId);
@@ -17,11 +17,11 @@ export const getProfile = async (userId) => {
 
     let profileData = null;
     if (user.role === "student") {
-        profileData = await Student.findOne({userId});
+        profileData = await Student.findOne({userId}).lean();
     }
 
     if (user.role === "instructor") {
-        profileData = await Instructor.findOne({userId});
+        profileData = await Instructor.findOne({userId}).lean();
     }
 
     return { ...user, profileData };
@@ -54,6 +54,9 @@ export const changePassword = async (userId, oldPassword, newPassword) => {
     }
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
+    console.log("Password changed for user:", userId);
+    console.log("Old Password:", oldPassword);
+    console.log("New Password:", newPassword);
     return true;
 }
 
@@ -64,12 +67,45 @@ export const deactivateAccount = async(userId) =>{
 
 // Student profile
 export const updateStudentProfile = async(userId, data) =>{
-    return await Student.findOneAndUpdate({userId}, data, {new: true});
+    const allowedFields = ["fullName", "dateOfBirth", "address", "phone"];
+    const updateData = {};
+
+    allowedFields.forEach((field) => {
+        if (data[field] !== undefined) {
+            updateData[field] = data[field];
+        }
+    });
+
+    const student = await Student.findOneAndUpdate(
+        { userId: new mongoose.Types.ObjectId(userId) },
+        { $set: updateData },
+        { new: true }
+    );
+    console.log("userId:", userId);
+    console.log("updateData:", updateData);
+    return student;
 }
 
 // instructor profile
 export const updateInstructorProfile = async(userId, data) => {
-    return await Instructor.findOneAndUpdate({userId}, data, {new: true});
+    const allowedFields = ["name", "bio", "expertise"];
+    const updateData = {};
+
+    allowedFields.forEach((field) => {
+        if (data[field] !== undefined) {
+            updateData[field] = data[field];
+        }
+    });
+
+    const instructor = await Instructor.findOneAndUpdate(
+        { userId: new mongoose.Types.ObjectId(userId) },
+        { $set: updateData },
+        { new: true }
+    );
+    console.log("userId:", userId);
+    console.log("updateData:", updateData);
+    return instructor;
+
 }
 
 
