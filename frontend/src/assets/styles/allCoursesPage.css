@@ -264,6 +264,10 @@
   cursor: pointer;
   font-weight: 700;
   transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
 
 .ghost-cta:hover {

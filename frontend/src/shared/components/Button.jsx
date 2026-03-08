@@ -1,21 +1,19 @@
-import "../styles/controls.css";
-
 export default function Button({
-    children,
-    variant = "primary",
-    loading,
-    ...props
+  children,
+  onClick,
+  type = "button",
+  loading = false,
+  disabled = false,
+  className = "",
 }) {
-    return (
-        <button
-            className={`btn ${variant}`}
-            disabled={loading || props.disabled}
-            {...props}
-        >
-            <span className={`btn__text ${loading ? "is-loading" : ""}`}>
-                {children}
-            </span>
-            {loading ? <span className="btn__spinner" /> : null}
-        </button>
-    );
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled || loading}
+      className={`inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-3 font-semibold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+    >
+      {loading ? "Loading..." : children}
+    </button>
+  );
 }

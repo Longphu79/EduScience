@@ -1,180 +1,18 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import TextField from "../../shared/components/TextField";
 import Button from "../../shared/components/Button";
 import Toast from "../../shared/components/Toast";
 import { CourseCard } from "../../shared/components/courseCard";
+import { getAllCourses } from "../../services/course.service";
 import "../../assets/styles/allCoursesPage.css";
 
-const mockCourses = [
-  {
-    _id: "1",
-    title: "ReactJS for Modern Frontend Development",
-    category: "Programming",
-    rating: 5,
-    totalReviews: 128,
-    price: 49,
-    totalLessons: 24,
-    duration: 18,
-    totalEnrollments: 2400,
-    level: "Beginner",
-    tag: "Best Seller",
-    thumbnail:
-      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
-    instructorId: {
-      name: "Emily Carter",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80",
-    },
-  },
-  {
-    _id: "2",
-    title: "Advanced Node.js Backend Architecture",
-    category: "Programming",
-    rating: 4,
-    totalReviews: 94,
-    price: 79,
-    totalLessons: 30,
-    duration: 22,
-    totalEnrollments: 1800,
-    level: "Advanced",
-    tag: "Hot",
-    thumbnail:
-      "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=1200&q=80",
-    instructorId: {
-      name: "Michael Brown",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80",
-    },
-  },
-  {
-    _id: "3",
-    title: "UI/UX Design Fundamentals for Beginners",
-    category: "Design",
-    rating: 5,
-    totalReviews: 166,
-    price: 39,
-    totalLessons: 20,
-    duration: 14,
-    totalEnrollments: 3100,
-    level: "Beginner",
-    tag: "Popular",
-    thumbnail:
-      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1200&q=80",
-    instructorId: {
-      name: "Sophia Lee",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=200&q=80",
-    },
-  },
-  {
-    _id: "4",
-    title: "Business Strategy and Startup Growth",
-    category: "Business",
-    rating: 4,
-    totalReviews: 73,
-    price: 55,
-    totalLessons: 18,
-    duration: 12,
-    totalEnrollments: 1200,
-    level: "Intermediate",
-    tag: "New",
-    thumbnail:
-      "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80",
-    instructorId: {
-      name: "Daniel Smith",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=200&q=80",
-    },
-  },
-  {
-    _id: "5",
-    title: "Digital Marketing Masterclass",
-    category: "Marketing",
-    rating: 4,
-    totalReviews: 102,
-    price: 45,
-    totalLessons: 26,
-    duration: 16,
-    totalEnrollments: 2000,
-    level: "Intermediate",
-    tag: "Trending",
-    thumbnail:
-      "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80",
-    instructorId: {
-      name: "Olivia Martinez",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80",
-    },
-  },
-  {
-    _id: "6",
-    title: "Data Science with Python",
-    category: "Data Science",
-    rating: 5,
-    totalReviews: 189,
-    price: 89,
-    totalLessons: 36,
-    duration: 28,
-    totalEnrollments: 3500,
-    level: "Advanced",
-    tag: "Top Rated",
-    thumbnail:
-      "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1200&q=80",
-    instructorId: {
-      name: "James Wilson",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1502767089025-6572583495b0?auto=format&fit=crop&w=200&q=80",
-    },
-  },
-  {
-    _id: "7",
-    title: "MongoDB from Zero to Hero",
-    category: "Programming",
-    rating: 4,
-    totalReviews: 88,
-    price: 42,
-    totalLessons: 21,
-    duration: 15,
-    totalEnrollments: 1450,
-    level: "Intermediate",
-    tag: "Hot",
-    thumbnail:
-      "https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=1200&q=80",
-    instructorId: {
-      name: "Ava Johnson",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=200&q=80",
-    },
-  },
-  {
-    _id: "8",
-    title: "Creative Brand Design Essentials",
-    category: "Design",
-    rating: 5,
-    totalReviews: 76,
-    price: 52,
-    totalLessons: 19,
-    duration: 13,
-    totalEnrollments: 970,
-    level: "Intermediate",
-    tag: "New",
-    thumbnail:
-      "https://images.unsplash.com/photo-1516321497487-e288fb19713f?auto=format&fit=crop&w=1200&q=80",
-    instructorId: {
-      name: "Emma Davis",
-      avatarUrl:
-        "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=200&q=80",
-    },
-  },
-];
-
 const categories = [
-  "All",
-  "Programming",
-  "Design",
-  "Business",
-  "Marketing",
-  "Data Science",
+  { label: "All", value: "All" },
+  { label: "Backend", value: "backend" },
+  { label: "Frontend", value: "frontend" },
+  { label: "Database", value: "database" },
+  { label: "UI/UX", value: "ui-ux" },
+  { label: "Mobile Development", value: "Mobile Development" },
 ];
 
 const levels = ["All", "Beginner", "Intermediate", "Advanced"];
@@ -192,73 +30,75 @@ export default function AllCoursesPage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeLevel, setActiveLevel] = useState("All");
   const [sortBy, setSortBy] = useState("popular");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState({
+    message: "",
+    kind: "success",
+  });
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const heroRef = useRef(null);
 
   const handleHeroMove = (e) => {
     const el = heroRef.current;
     if (!el) return;
+
     const rect = el.getBoundingClientRect();
     el.style.setProperty("--mx", `${e.clientX - rect.left}px`);
     el.style.setProperty("--my", `${e.clientY - rect.top}px`);
   };
 
-  const filteredCourses = useMemo(() => {
-    let data = [...mockCourses];
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        setLoading(true);
 
-    if (keyword.trim()) {
-      const lower = keyword.toLowerCase();
-      data = data.filter(
-        (course) =>
-          course.title.toLowerCase().includes(lower) ||
-          course.category.toLowerCase().includes(lower) ||
-          course.level.toLowerCase().includes(lower) ||
-          course.instructorId?.name?.toLowerCase().includes(lower)
-      );
-    }
+        const data = await getAllCourses({
+          search: keyword,
+          category: activeCategory,
+          level: activeLevel === "All" ? "All" : activeLevel.toLowerCase(),
+          sortBy,
+        });
 
-    if (activeCategory !== "All") {
-      data = data.filter((course) => course.category === activeCategory);
-    }
+        setCourses(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error(error);
+        setToast({
+          message: error.message || "Failed to load courses",
+          kind: "error",
+        });
+        setCourses([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    if (activeLevel !== "All") {
-      data = data.filter((course) => course.level === activeLevel);
-    }
-
-    switch (sortBy) {
-      case "rating":
-        data.sort((a, b) => b.rating - a.rating);
-        break;
-      case "priceAsc":
-        data.sort((a, b) => a.price - b.price);
-        break;
-      case "priceDesc":
-        data.sort((a, b) => b.price - a.price);
-        break;
-      case "newest":
-        data.reverse();
-        break;
-      default:
-        data.sort((a, b) => b.totalEnrollments - a.totalEnrollments);
-    }
-
-    return data;
+    fetchCourses();
   }, [keyword, activeCategory, activeLevel, sortBy]);
 
-  const totalCourses = mockCourses.length;
-  const totalStudents = mockCourses.reduce(
-    (sum, item) => sum + item.totalEnrollments,
-    0
-  );
-  const avgRating = (
-    mockCourses.reduce((sum, item) => sum + item.rating, 0) / mockCourses.length
-  ).toFixed(1);
+  const totalCourses = courses.length;
 
-  const featuredCourses = mockCourses.slice(0, 4);
+  const totalStudents = useMemo(
+    () => courses.reduce((sum, item) => sum + (item.totalEnrollments || 0), 0),
+    [courses]
+  );
+
+  const avgRating = useMemo(() => {
+    if (!courses.length) return "0.0";
+    return (
+      courses.reduce((sum, item) => sum + (item.rating || 0), 0) / courses.length
+    ).toFixed(1);
+  }, [courses]);
+
+  const featuredCourses = courses.slice(0, 4);
 
   return (
     <div className="courses-page">
-      <Toast kind="success" message={toast} onClose={() => setToast("")} />
+      <Toast
+        kind={toast.kind}
+        message={toast.message}
+        onClose={() => setToast({ message: "", kind: "success" })}
+      />
 
       <div className="courses-bg-orb orb-1" />
       <div className="courses-bg-orb orb-2" />
@@ -270,7 +110,6 @@ export default function AllCoursesPage() {
         className="courses-hero premium-spotlight"
         onMouseMove={handleHeroMove}
       >
-        
         <div className="hero-floating-chip chip-3">Career Growth</div>
         <div className="hero-floating-chip chip-4">Skill Upgrade</div>
 
@@ -295,11 +134,19 @@ export default function AllCoursesPage() {
           </p>
 
           <div className="courses-hero__actions">
-            <Button onClick={() => setToast("Start exploring our premium courses!")}>
+            <Button
+              onClick={() =>
+                setToast({
+                  message: "Start exploring our premium courses!",
+                  kind: "success",
+                })
+              }
+            >
               Start Learning
             </Button>
 
             <button
+              type="button"
               className="ghost-cta"
               onClick={() => window.scrollTo({ top: 860, behavior: "smooth" })}
             >
@@ -354,9 +201,9 @@ export default function AllCoursesPage() {
             <div className="hero-panel-footer">
               <div>
                 <span className="hero-panel-footer__label">Trusted by learners</span>
-                <strong>16,000+ enrollments</strong>
+                <strong>{totalStudents}+ enrollments</strong>
               </div>
-              <div className="hero-panel-rating">★ 4.9</div>
+              <div className="hero-panel-rating">★ {avgRating}</div>
             </div>
           </div>
         </div>
@@ -396,7 +243,7 @@ export default function AllCoursesPage() {
         <div className="highlight-strip">
           {featuredCourses.map((course) => (
             <div key={course._id} className="highlight-pill">
-              <span>{course.tag}</span>
+              <span>{course.isPopular ? "Popular" : "Featured"}</span>
               <strong>{course.title}</strong>
             </div>
           ))}
@@ -436,13 +283,14 @@ export default function AllCoursesPage() {
           <div className="courses-categories">
             {categories.map((category) => (
               <button
-                key={category}
+                key={category.value}
+                type="button"
                 className={`category-chip ${
-                  activeCategory === category ? "active" : ""
+                  activeCategory === category.value ? "active" : ""
                 }`}
-                onClick={() => setActiveCategory(category)}
+                onClick={() => setActiveCategory(category.value)}
               >
-                {category}
+                {category.label}
               </button>
             ))}
           </div>
@@ -454,6 +302,7 @@ export default function AllCoursesPage() {
             {levels.map((level) => (
               <button
                 key={level}
+                type="button"
                 className={`category-chip ${
                   activeLevel === level ? "active" : ""
                 }`}
@@ -472,19 +321,29 @@ export default function AllCoursesPage() {
             <span className="section-kicker">Explore Catalog</span>
             <h2>Discover the right course for your next step</h2>
           </div>
-          <p>{filteredCourses.length} course(s) found</p>
+          <p>{courses.length} course(s) found</p>
         </div>
 
-        {filteredCourses.length === 0 ? (
+        {loading ? (
+          <div className="courses-empty">
+            <h3>Loading courses...</h3>
+          </div>
+        ) : courses.length === 0 ? (
           <div className="courses-empty">
             <h3>No matching courses found</h3>
             <p>Try another keyword, level, or category.</p>
           </div>
         ) : (
           <div className="courses-grid">
-            {filteredCourses.map((course) => (
-              <div key={course._id} className="courses-grid__item enhanced-card-wrap">
-                <div className="card-top-badge">{course.tag}</div>
+            {courses.map((course) => (
+              <div
+                key={course._id}
+                className="courses-grid__item enhanced-card-wrap"
+              >
+                <div className="card-top-badge">
+                  {course.isPopular ? "Popular" : "Course"}
+                </div>
+
                 <CourseCard course={course} />
               </div>
             ))}
@@ -535,10 +394,20 @@ export default function AllCoursesPage() {
           </div>
 
           <div className="courses-cta__actions">
-            <Button onClick={() => setToast("You are ready to start learning!")}>
+            <Button
+              onClick={() =>
+                setToast({
+                  message: "You are ready to start learning!",
+                  kind: "success",
+                })
+              }
+            >
               Join Now
             </Button>
-            <button className="ghost-cta">View Learning Paths</button>
+
+            <a href="/my-courses" className="ghost-cta">
+              View My Courses
+            </a>
           </div>
         </div>
       </section>
