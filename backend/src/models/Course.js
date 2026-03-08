@@ -12,18 +12,36 @@ const courseSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      trim: true,
     },
 
     shortDescription: {
       type: String,
       required: true,
       maxlength: 160,
+      trim: true,
     },
 
-    description: String,
-    category: String,
-    thumbnail: String,
-    previewVideo: String,
+    description: {
+      type: String,
+      default: "",
+    },
+
+    category: {
+      type: String,
+      default: "General",
+      trim: true,
+    },
+
+    thumbnail: {
+      type: String,
+      default: "",
+    },
+
+    previewVideo: {
+      type: String,
+      default: "",
+    },
 
     level: {
       type: String,
@@ -39,6 +57,7 @@ const courseSchema = new mongoose.Schema(
     duration: {
       type: Number, // phút
       default: 0,
+      min: 0,
     },
 
     price: {
@@ -50,6 +69,7 @@ const courseSchema = new mongoose.Schema(
     salePrice: {
       type: Number,
       min: 0,
+      default: null,
     },
 
     isFree: {
@@ -58,24 +78,28 @@ const courseSchema = new mongoose.Schema(
     },
 
     instructorId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Instructor",
-      required: true,
-    },
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  required: true,
+},
 
     rating: {
       type: Number,
       default: 0,
+      min: 0,
+      max: 5,
     },
 
     totalReviews: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
     totalEnrollments: {
       type: Number,
       default: 0,
+      min: 0,
     },
 
     isPopular: {
@@ -89,17 +113,20 @@ const courseSchema = new mongoose.Schema(
       default: "draft",
     },
 
-    lessonIds: 
+    lessonIds: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Lesson",
       },
+    ],
 
-      totalLessons: {
-        type: Number,
-        default: 0,
-      },
-  }, { timestamps: true }
+    totalLessons: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+  },
+  { timestamps: true }
 );
 
 export default mongoose.model("Course", courseSchema);

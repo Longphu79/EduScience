@@ -9,21 +9,27 @@ const lessonSchema = new mongoose.Schema(
     },
 
     description: {
-      type: String, // mô tả ngắn nội dung bài học
+      type: String,
+      default: "",
     },
 
     videoUrl: {
       type: String,
-      required: true, // video bài học
+      required: true,
+    },
+
+    materialUrl: {
+      type: String,
+      default: "",
     },
 
     duration: {
-      type: Number, // thời lượng (phút hoặc giây)
+      type: Number,
       default: 0,
     },
 
     order: {
-      type: Number, // thứ tự trong section
+      type: Number,
       required: true,
     },
 
@@ -41,7 +47,7 @@ const lessonSchema = new mongoose.Schema(
 
     isPreview: {
       type: Boolean,
-      default: false, // cho phép xem trước khi mua
+      default: false,
     },
 
     isPublished: {

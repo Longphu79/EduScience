@@ -4,7 +4,7 @@ const enrollmentSchema = new mongoose.Schema(
   {
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Student",
+      ref: "User",
       required: true,
     },
 
@@ -30,10 +30,24 @@ const enrollmentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    completedLessons: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Lesson",
+      },
+    ],
+
+    lastLessonId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Lesson",
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
 enrollmentSchema.index({ studentId: 1, courseId: 1 }, { unique: true });
 
-export default mongoose.model("Enrollment", enrollmentSchema);
+export default mongoose.models.Enrollment ||
+  mongoose.model("Enrollment", enrollmentSchema);
