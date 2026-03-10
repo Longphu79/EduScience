@@ -1,9 +1,25 @@
+import { useState } from "react";
 import { useCart } from "../../features/cart/state/cartContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { createCheckout } from "../../features/checkout/api/checkoutApi";
 
 const Cart = () => {
     const { cartItems, removeFromCart, updateQuantity, getTotalPrice } =
         useCart();
+    const navigate = useNavigate();
+    const [checkingOut, setCheckingOut] = useState(false);
+
+    const handleCheckout = async () => {
+        setCheckingOut(true);
+        try {
+            const result = await createCheckout();
+            navigate(`/checkout/${result.orderId}`);
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setCheckingOut(false);
+        }
+    };
 
     return (
         <div className="max-w-6xl mx-auto p-6">
@@ -82,8 +98,12 @@ const Cart = () => {
                             </span>
                         </div>
 
-                        <button className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition">
-                            Proceed to Checkout
+                        <button
+                            onClick={handleCheckout}
+                            disabled={checkingOut}
+                            className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                        >
+                            {checkingOut ? "Processing..." : "Proceed to Checkout"}
                         </button>
                     </div>
                 </div>
