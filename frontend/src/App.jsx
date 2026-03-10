@@ -6,8 +6,11 @@ import Home from "./pages/home/home.jsx";
 import About from "./pages/aboutus/about.jsx";
 import Cart from "./pages/cart/cart.jsx";
 import AllCoursesPage from "./pages/course/AllCoursesPage.jsx";
+import CourseForm from "./pages/course/CourseForm.jsx";
+import LessonManager from "./pages/course/LessonManager.jsx";
 import Wishlist from "./pages/wishlist/wishlist.jsx";
 import ProfilePage from "./pages/profile/ProfilePage.jsx";
+import CheckoutPage from "./pages/checkout/CheckoutPage.jsx";
 import { Features } from "./pages/home/features.jsx";
 
 function App() {
@@ -19,9 +22,13 @@ function App() {
                     <Route path="/" element={<Home />} />
                     <Route path="/features" element={<Features />} />
                     <Route path="/courses" element={<AllCoursesPage />} />
+                    <Route path="/course/create" element={<CourseForm />} />
+                    <Route path="/course/:courseId/edit" element={<CourseForm />} />
+                    <Route path="/course/:courseId/lessons" element={<LessonManager />} />
                     <Route path="/aboutus" element={<About />} />
                     <Route path="/wishlist" element={<Wishlist />} />
                     <Route path="/cart" element={<Cart />} />
+                    <Route path="/checkout/:orderId" element={<CheckoutPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                 </Route>
                 <Route path="/login" element={<Login />} />
