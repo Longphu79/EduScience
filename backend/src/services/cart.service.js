@@ -69,6 +69,38 @@ export const addCourseToCart = async (userId, courseId) => {
   return await cart.populate("items.course");
 };
 
+/**
+ * Cập nhật số lượng course trong cart
+ */
+export const updateCourseQuantity = async (userId, courseId, quantity) => {
+  if (!mongoose.Types.ObjectId.isValid(courseId)) {
+    throw new Error("Invalid courseId");
+  }
+
+  if (quantity < 1) {
+    throw new Error("Quantity must be at least 1");
+  }
+
+  const cart = await Cart.findOne({ user: new mongoose.Types.ObjectId(userId) });
+
+  if (!cart) {
+    throw new Error("Cart not found");
+  }
+
+  const item = cart.items.find(
+    (item) => item.course.toString() === courseId.toString()
+  );
+
+  if (!item) {
+    throw new Error("Course not found in cart");
+  }
+
+  item.quantity = quantity;
+  await cart.save();
+
+  return await cart.populate("items.course");
+};
+
 export const removeCourseFromCart = async (userId, courseId) => {
   if (!mongoose.Types.ObjectId.isValid(courseId)) {
     throw new Error("Invalid courseId");
