@@ -5,14 +5,16 @@ export async function request(path, options = {}) {
 
   const { data, method = "GET", headers = {}, ...rest } = options;
 
+  const isFormData = data instanceof FormData;
+
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: {
-      "Content-Type": "application/json",
+      ...(!isFormData && { "Content-Type": "application/json" }),
       ...(token && { Authorization: `Bearer ${token}` }),
       ...headers
     },
-    ...(data ? { body: JSON.stringify(data) } : {}),
+    ...(data ? { body: isFormData ? data : JSON.stringify(data) } : {}),
     ...rest
   });
 
