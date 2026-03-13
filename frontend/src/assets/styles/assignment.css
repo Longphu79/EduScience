@@ -1,0 +1,128 @@
+.assignment-page {
+  min-height: 100vh;
+  padding: 36px 24px 70px;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 26%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.assignment-wrapper {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.assignment-shell {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #e5e7eb;
+  border-radius: 28px;
+  padding: 28px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
+.assignment-title {
+  margin: 0 0 12px;
+  font-size: 34px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.assignment-desc {
+  margin: 0 0 12px;
+  color: #64748b;
+  line-height: 1.8;
+}
+
+.assignment-meta {
+  margin-bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.assignment-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.assignment-textarea,
+.assignment-input {
+  width: 100%;
+  border: 1px solid #dbe2ea;
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  outline: none;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.assignment-textarea {
+  min-height: 150px;
+  resize: vertical;
+  margin-bottom: 14px;
+}
+
+.assignment-input {
+  margin-bottom: 16px;
+}
+
+.assignment-textarea:focus,
+.assignment-input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.12);
+}
+
+.assignment-btn-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.assignment-submit-btn,
+.assignment-resubmit-btn {
+  border: none;
+  border-radius: 14px;
+  padding: 14px 22px;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.assignment-submit-btn {
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+}
+
+.assignment-resubmit-btn {
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+}
+
+.assignment-submit-btn:hover,
+.assignment-resubmit-btn:hover {
+  transform: translateY(-2px);
+}
+
+.assignment-help {
+  margin-top: 12px;
+  color: #64748b;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .assignment-page {
+    padding: 20px 16px 40px;
+  }
+
+  .assignment-shell {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .assignment-title {
+    font-size: 28px;
+  }
+}

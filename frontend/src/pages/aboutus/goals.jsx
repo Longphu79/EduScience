@@ -1,66 +1,87 @@
 import {
-    Card,
-    CardHeader,
-    CardContent,
-    CardTitle,
-    CardDescription,
+  Card,
+  CardHeader,
+  CardContent,
+  CardTitle,
+  CardDescription,
 } from "../../shared/components/card.jsx";
-
-import { Brain, Shield, Zap, Users } from "lucide-react";
+import {
+  Brain,
+  Shield,
+  Zap,
+  Users,
+  Target,
+  TrendingUp,
+} from "lucide-react";
 
 const goals = [
-    {
-        title: "Enhance Learning Experience",
-        description:
-            "Provide an engaging and interactive learning environment.",
-        icon: Brain,
-    },
-    {
-        title: "Foster Community",
-        description: "Build a supportive community for learners and educators.",
-        icon: Users,
-    },
-    {
-        title: "Promote Innovation",
-        description: "Encourage creative thinking and innovation in education.",
-        icon: Zap,
-    },
-    {
-        title: "Ensure Quality",
-        description: "Maintain high standards in all educational content.",
-        icon: Shield,
-    },
+  {
+    title: "Enhance learning experience",
+    description:
+      "Create a more engaging, structured, and interactive digital learning environment for students.",
+    icon: Brain,
+  },
+  {
+    title: "Foster community",
+    description:
+      "Build a supportive learning ecosystem where students and instructors can connect and grow together.",
+    icon: Users,
+  },
+  {
+    title: "Promote innovation",
+    description:
+      "Encourage modern teaching methods, digital workflows, and practical educational innovation.",
+    icon: Zap,
+  },
+  {
+    title: "Ensure quality",
+    description:
+      "Maintain high standards in course structure, learning content, and overall platform experience.",
+    icon: Shield,
+  },
+  {
+    title: "Drive clear outcomes",
+    description:
+      "Help learners achieve measurable progress through guided lessons, assessments, and visible results.",
+    icon: Target,
+  },
+  {
+    title: "Support continuous growth",
+    description:
+      "Enable long-term development for both learners and educators through scalable and future-ready learning tools.",
+    icon: TrendingUp,
+  },
 ];
 
 export function Goals() {
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {goals.map((goal, index) => {
-                const Icon = goal.icon;
+  return (
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      {goals.map((goal, index) => {
+        const Icon = goal.icon;
 
-                return (
-                    <Card
-                        key={index}
-                        className="bg-white hover:border-gray-300 transition-colors"
-                    >
-                        <CardHeader>
-                            <div className="w-12 h-12 rounded-lg bg-black/5 flex items-center justify-center mb-4">
-                                <Icon className="w-6 h-6 text-black" />
-                            </div>
+        return (
+          <Card
+            key={index}
+            className="rounded-[24px] border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg"
+          >
+            <CardHeader className="pb-3">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+                <Icon className="h-7 w-7 text-slate-900" />
+              </div>
 
-                            <CardTitle className="text-xl font-medium">
-                                {goal.title}
-                            </CardTitle>
-                        </CardHeader>
+              <CardTitle className="text-xl font-bold text-slate-950">
+                {goal.title}
+              </CardTitle>
+            </CardHeader>
 
-                        <CardContent>
-                            <CardDescription className="text-gray-600 leading-relaxed">
-                                {goal.description}
-                            </CardDescription>
-                        </CardContent>
-                    </Card>
-                );
-            })}
-        </div>
-    );
+            <CardContent>
+              <CardDescription className="leading-7 text-slate-600">
+                {goal.description}
+              </CardDescription>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
 }

@@ -1,0 +1,120 @@
+.chat-page {
+  min-height: 100vh;
+  padding: 32px 24px 70px;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(124, 58, 237, 0.08), transparent 24%),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.chat-wrapper {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.chat-shell {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #e5e7eb;
+  border-radius: 28px;
+  padding: 24px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
+.chat-title {
+  margin: 0 0 16px;
+  font-size: 30px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.chat-box {
+  height: 420px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  background: #f8fafc;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.chat-message {
+  max-width: 75%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  margin-bottom: 12px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.chat-message.self {
+  margin-left: auto;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: #fff;
+  border-bottom-right-radius: 6px;
+}
+
+.chat-message.other {
+  margin-right: auto;
+  background: #fff;
+  color: #334155;
+  border: 1px solid #e5e7eb;
+  border-bottom-left-radius: 6px;
+}
+
+.chat-sender {
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  opacity: 0.8;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 12px;
+}
+
+.chat-input {
+  flex: 1;
+  border: 1px solid #dbe2ea;
+  border-radius: 16px;
+  padding: 14px 16px;
+  outline: none;
+  background: #fff;
+}
+
+.chat-input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.12);
+}
+
+.chat-send-btn {
+  border: none;
+  border-radius: 16px;
+  padding: 0 20px;
+  background: linear-gradient(135deg, #7c3aed, #2563eb);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .chat-page {
+    padding: 20px 16px 40px;
+  }
+
+  .chat-shell {
+    border-radius: 22px;
+    padding: 18px;
+  }
+
+  .chat-box {
+    height: 340px;
+  }
+
+  .chat-input-row {
+    flex-direction: column;
+  }
+
+  .chat-send-btn {
+    height: 48px;
+  }
+}

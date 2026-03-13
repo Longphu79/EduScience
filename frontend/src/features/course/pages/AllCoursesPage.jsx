@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import TextField from "../../shared/components/TextField";
-import Button from "../../shared/components/Button";
-import Toast from "../../shared/components/Toast";
-import { CourseCard } from "../../shared/components/courseCard";
-import { getAllCourses } from "../../services/course.service";
-import "../../assets/styles/allCoursesPage.css";
+import Button from "../../../shared/components/Button";
+import Toast from "../../../shared/components/Toast";
+import { CourseCard } from "../../../shared/components/courseCard";
+import { getAllCourses } from "../services/course.service";
+import "../../../assets/styles/allCoursesPage.css";
 
 const categories = [
   { label: "All", value: "All" },
@@ -60,7 +59,7 @@ export default function AllCoursesPage() {
           sortBy,
         });
 
-        setCourses(Array.isArray(data) ? data : []);
+        setCourses(Array.isArray(data) ? data : data?.data || []);
       } catch (error) {
         console.error(error);
         setToast({
@@ -252,11 +251,14 @@ export default function AllCoursesPage() {
 
       <section className="courses-toolbar">
         <div className="courses-toolbar__search">
-          <TextField
-            label="Search courses"
+          <label className="mb-2 block text-sm font-medium text-slate-700">
+            Search courses
+          </label>
+          <input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder="Search by title, category, level, instructor..."
+            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-violet-500"
           />
         </div>
 
@@ -349,67 +351,6 @@ export default function AllCoursesPage() {
             ))}
           </div>
         )}
-      </section>
-
-      <section className="courses-benefits">
-        <div className="section-heading">
-          <div>
-            <span className="section-kicker">Why EduScience</span>
-            <h2>A learning platform built for serious growth</h2>
-          </div>
-          <p>
-            Strong visual design, clear course discovery, and practical content
-            structure help learners stay focused and motivated.
-          </p>
-        </div>
-
-        <div className="benefit-grid">
-          <div className="benefit-card">
-            <div className="benefit-icon">⚡</div>
-            <h3>Fast & focused</h3>
-            <p>Modern catalog browsing with less friction and cleaner discovery.</p>
-          </div>
-          <div className="benefit-card">
-            <div className="benefit-icon">🎯</div>
-            <h3>Career-oriented</h3>
-            <p>Content designed around real skills, real tools, and real outcomes.</p>
-          </div>
-          <div className="benefit-card">
-            <div className="benefit-icon">🌍</div>
-            <h3>Flexible access</h3>
-            <p>Learn comfortably across devices with a premium visual experience.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="courses-cta">
-        <div className="courses-cta__inner">
-          <div>
-            <span className="section-kicker">Get Started</span>
-            <h2>Ready to unlock your next learning milestone?</h2>
-            <p>
-              Join a platform built to help learners stay inspired, focused, and
-              future-ready with a polished modern interface.
-            </p>
-          </div>
-
-          <div className="courses-cta__actions">
-            <Button
-              onClick={() =>
-                setToast({
-                  message: "You are ready to start learning!",
-                  kind: "success",
-                })
-              }
-            >
-              Join Now
-            </Button>
-
-            <a href="/my-courses" className="ghost-cta">
-              View My Courses
-            </a>
-          </div>
-        </div>
       </section>
     </div>
   );

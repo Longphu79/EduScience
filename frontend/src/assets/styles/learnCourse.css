@@ -320,10 +320,13 @@
   background: #fff;
   color: #334155;
   border: 1px solid #e2e8f0;
+  cursor: pointer;
 }
 
 .learn-secondary-btn:hover {
   background: #f8fafc;
+  border-color: #c4b5fd;
+  color: #6d28d9;
 }
 
 .learn-lesson-actions,
@@ -405,6 +408,20 @@
     transform: scale(1);
     box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
   }
+}
+
+/* tab content extras */
+.learn-tab-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.learn-content-card .material-card,
+.learn-content-card .assignment-card,
+.learn-content-card .quiz-card {
+  margin-bottom: 12px;
 }
 
 @media (max-width: 1100px) {

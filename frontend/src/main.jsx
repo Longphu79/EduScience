@@ -6,11 +6,11 @@ import AuthProvider from "./features/auth/state/authProvider";
 import { CartProvider } from "./features/cart/state/cartContext";
 
 createRoot(document.getElementById("root")).render(
-    <StrictMode>
-        <AuthProvider>
-            <CartProvider>
-                <App />
-            </CartProvider>
-        </AuthProvider>
-    </StrictMode>,
+  <StrictMode>
+    <AuthProvider>
+      <CartProvider>
+        <App />
+      </CartProvider>
+    </AuthProvider>
+  </StrictMode>
 );

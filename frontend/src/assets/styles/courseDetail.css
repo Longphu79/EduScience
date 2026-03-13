@@ -249,12 +249,23 @@
   font-weight: 700;
   text-decoration: none;
   border: none;
+  transition: all 0.25s ease;
+}
+
+.continue-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 26px rgba(124, 58, 237, 0.2);
 }
 
 .continue-btn.secondary {
   background: white;
   color: #334155;
   border: 1px solid #e5e7eb;
+}
+
+.continue-btn.secondary:hover {
+  border-color: #c4b5fd;
+  color: #6d28d9;
 }
 
 .preview-video {
@@ -269,6 +280,14 @@
   height: 360px;
   border: 0;
   border-radius: 16px;
+}
+
+.course-section .grid a {
+  text-decoration: none;
+}
+
+.course-section .grid a:hover {
+  border-color: #c4b5fd;
 }
 
 @media (max-width: 1000px) {
@@ -304,5 +323,9 @@
 
   .instructor-detail-box {
     flex-direction: column;
+  }
+
+  .course-section .grid {
+    grid-template-columns: 1fr !important;
   }
 }

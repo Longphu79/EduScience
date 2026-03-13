@@ -1,22 +1,28 @@
-const API_BASE_RAW = import.meta.env.VITE_API_URL || "http://localhost:3000";
-const API_BASE = API_BASE_RAW.replace(/\/+$/, "");
+import axios from "axios";
 
-export async function request(path, options = {}) {
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+const request = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000",
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
-  const res = await fetch(`${API_BASE}${normalizedPath}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
+request.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
 
-  const data = await res.json().catch(() => ({}));
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
 
-  if (!res.ok) {
-    throw new Error(data?.message || "Request failed");
-  }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-  return data;
-}
+request.interceptors.response.use(
+  (response) => response,
+  (error) => Promise.reject(error)
+);
+
+export default request;

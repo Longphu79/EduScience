@@ -1,75 +1,73 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import {
-  getCartApi,
-  addToCartApi,
-  removeFromCartApi,
-  updateQuantityApi,
-} from "../api/cartApi";
+import { getMyCart } from "../services/cart.service";
+import { useAuth } from "../../auth/state/useAuth";
 
-export const CartContext = createContext(null);
+const CartContext = createContext(null);
 
-export const CartProvider = ({ children }) => {
-  const [cartItems, setCartItems] = useState([]);
-
-  // 🔥 Load cart khi app mount
-  useEffect(() => {
-    loadCart();
-  }, []);
+export function CartProvider({ children }) {
+  const { isAuthenticated } = useAuth();
+  const [cart, setCart] = useState({ items: [] });
+  const [loading, setLoading] = useState(false);
 
   const loadCart = async () => {
     try {
-      const data = await getCartApi();
+      const token = localStorage.getItem("token");
 
-      if (data?.items) {
-        const formatted = data.items.map((item) => ({
-          id: item.course._id,
-          title: item.course.title,
-          price: item.course.price,
-          quantity: item.quantity,
-        }));
-
-        setCartItems(formatted);
+      if (!isAuthenticated || !token) {
+        setCart({ items: [] });
+        return;
       }
-    } catch (err) {
-      console.log("Load cart error:", err);
+
+      setLoading(true);
+
+      const response = await getMyCart();
+      const payload = response?.data || response || { items: [] };
+
+      setCart({
+        items: Array.isArray(payload?.items) ? payload.items : [],
+        ...payload,
+      });
+    } catch (error) {
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message || error?.message;
+
+      if (status === 401) {
+        localStorage.removeItem("token");
+        setCart({ items: [] });
+        return;
+      }
+
+      console.error("Load cart error:", message || error);
+      setCart({ items: [] });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const addToCart = async (courseId) => {
-    await addToCartApi(courseId);
-    await loadCart();
-  };
-
-  const removeFromCart = async (courseId) => {
-    await removeFromCartApi(courseId);
-    await loadCart();
-  };
-
-  const updateQuantity = async (courseId, quantity) => {
-    if (quantity < 1) return;
-    await updateQuantityApi(courseId, quantity);
-    await loadCart();
-  };
-
-  const getTotalPrice = () =>
-    cartItems.reduce(
-      (total, item) => total + item.price * item.quantity,
-      0
-    );
+  useEffect(() => {
+    loadCart();
+  }, [isAuthenticated]);
 
   return (
     <CartContext.Provider
       value={{
-        cartItems,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        getTotalPrice,
+        cart,
+        setCart,
+        loading,
+        loadCart,
       }}
     >
       {children}
     </CartContext.Provider>
   );
-};
+}
 
-export const useCart = () => useContext(CartContext);
+export function useCart() {
+  const context = useContext(CartContext);
+
+  if (!context) {
+    throw new Error("useCart must be used within CartProvider");
+  }
+
+  return context;
+}

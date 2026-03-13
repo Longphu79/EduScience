@@ -1,20 +1,19 @@
-import { Star } from "lucide-react";
+export function RatingStars({ rating = 0 }) {
+  const safeRating = Math.max(0, Math.min(5, Number(rating) || 0));
 
-export function RatingStars({ rating }) {
-    return(
-        <div className="flex items-center gap-1">
-            {[1,2,3,4,5].map(i => (
-                <Star
-                    key={i}
-                    size={14}
-                    className={
-                        i <= rating
-                            ?'fill-red-500 text-red-500'
-                            :'text-gray-300'
-                    }
-                />
-            ))}
-            <span className="ml-2 text-neutral-600 text-sm">{rating}</span>
-        </div>
-    );
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: 5 }).map((_, index) => {
+        const filled = index < safeRating;
+        return (
+          <span
+            key={index}
+            className={filled ? "text-amber-400" : "text-slate-300"}
+          >
+            ★
+          </span>
+        );
+      })}
+    </div>
+  );
 }
