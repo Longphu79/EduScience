@@ -1,10 +1,28 @@
 import mongoose from "mongoose";
 
-const courseChatMessageSchema = new mongoose.Schema(
+const chatMessageSchema = new mongoose.Schema(
   {
+    conversationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ChatConversation",
+      required: true,
+      index: true,
+    },
     courseId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",
+      required: true,
+      index: true,
+    },
+    studentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    instructorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
       index: true,
     },
@@ -19,14 +37,15 @@ const courseChatMessageSchema = new mongoose.Schema(
       enum: ["student", "instructor", "admin"],
       required: true,
     },
-    message: { type: String, required: true, trim: true },
+    message: {
+      type: String,
+      required: true,
+      trim: true,
+    },
   },
   { timestamps: true }
 );
 
-const CourseChatMessage = mongoose.model(
-  "CourseChatMessage",
-  courseChatMessageSchema
-);
+const ChatMessage = mongoose.model("ChatMessage", chatMessageSchema);
 
-export default CourseChatMessage;
+export default ChatMessage;

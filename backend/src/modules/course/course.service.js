@@ -10,6 +10,25 @@ function roundNumber(value = 0) {
   return Math.round(Number(value) || 0);
 }
 
+function normalizeSortValue(rawSort) {
+  switch (rawSort) {
+    case "popular":
+      return { totalEnrollments: -1, createdAt: -1 };
+    case "rating":
+      return { rating: -1, createdAt: -1 };
+    case "priceAsc":
+    case "price-low":
+      return { price: 1, createdAt: -1 };
+    case "priceDesc":
+    case "price-high":
+      return { price: -1, createdAt: -1 };
+    case "newest":
+      return { createdAt: -1 };
+    default:
+      return { createdAt: -1 };
+  }
+}
+
 async function buildInstructorCourseAnalytics(courses = []) {
   if (!courses.length) return [];
 
@@ -142,11 +161,11 @@ async function buildInstructorCourseAnalytics(courses = []) {
 }
 
 export const getPopularCourses = async () => {
-  const courses = await Course.find({
+  return await Course.find({
     isPopular: true,
     status: "published",
   })
-    .sort({ totalEnrollments: -1 })
+    .sort({ totalEnrollments: -1, createdAt: -1 })
     .limit(6)
     .populate("instructorId")
     .populate({
@@ -154,24 +173,30 @@ export const getPopularCourses = async () => {
       match: { isPublished: true },
       options: { sort: { order: 1, createdAt: 1 } },
     });
-
-  return courses;
 };
 
 export const createCourse = async (courseData) => {
   const payload = { ...courseData };
+
+  if (!payload.instructorId) {
+    throw new Error("Instructor ID is required");
+  }
+
+  delete payload._id;
+  delete payload.totalEnrollments;
+  delete payload.totalReviews;
+  delete payload.rating;
 
   if (payload.isFree) {
     payload.price = 0;
     payload.salePrice = 0;
   }
 
-  if (Array.isArray(payload.lessonIds)) {
-    payload.totalLessons = payload.lessonIds.length;
-  } else {
+  if (!Array.isArray(payload.lessonIds)) {
     payload.lessonIds = [];
-    payload.totalLessons = 0;
   }
+
+  payload.totalLessons = payload.lessonIds.length;
 
   return await Course.create(payload);
 };
@@ -200,13 +225,9 @@ export const getCourseBySlug = async (slug) => {
 };
 
 export const getAllCourses = async (query = {}) => {
-  const filter = {};
-
-  if (query.status) {
-    filter.status = query.status;
-  } else {
-    filter.status = "published";
-  }
+  const filter = {
+    status: query.status || "published",
+  };
 
   if (query.search) {
     filter.$or = [
@@ -224,30 +245,11 @@ export const getAllCourses = async (query = {}) => {
     filter.level = String(query.level).toLowerCase();
   }
 
-  let sort = { createdAt: -1 };
+  const sort = normalizeSortValue(query.sortBy || query.sort);
 
-  switch (query.sortBy) {
-    case "popular":
-      sort = { totalEnrollments: -1, createdAt: -1 };
-      break;
-    case "rating":
-      sort = { rating: -1, createdAt: -1 };
-      break;
-    case "priceAsc":
-      sort = { price: 1, createdAt: -1 };
-      break;
-    case "priceDesc":
-      sort = { price: -1, createdAt: -1 };
-      break;
-    case "newest":
-      sort = { createdAt: -1 };
-      break;
-    default:
-      sort = { createdAt: -1 };
-      break;
-  }
-
-  return await Course.find(filter).populate("instructorId").sort(sort);
+  return await Course.find(filter)
+    .populate("instructorId")
+    .sort(sort);
 };
 
 export const getCoursesByInstructor = async (instructorId) => {
@@ -260,7 +262,7 @@ export const getCoursesByInstructor = async (instructorId) => {
     .sort({ createdAt: -1 })
     .lean();
 
-  return buildInstructorCourseAnalytics(courses);
+  return await buildInstructorCourseAnalytics(courses);
 };
 
 export const getCourseLearningDetail = async (courseId) => {
@@ -273,8 +275,31 @@ export const getCourseLearningDetail = async (courseId) => {
     });
 };
 
-export const updateCourse = async (courseId, updateData) => {
+export const updateCourse = async (
+  courseId,
+  updateData,
+  { requesterId, requesterRole } = {}
+) => {
+  const existingCourse = await Course.findById(courseId);
+
+  if (!existingCourse) {
+    throw new Error("Course not found");
+  }
+
+  if (
+    requesterRole !== "admin" &&
+    String(existingCourse.instructorId) !== String(requesterId)
+  ) {
+    throw new Error("You are not allowed to update this course");
+  }
+
   const payload = { ...updateData };
+
+  delete payload.instructorId;
+  delete payload._id;
+  delete payload.totalEnrollments;
+  delete payload.totalReviews;
+  delete payload.rating;
 
   if (payload.isFree) {
     payload.price = 0;
@@ -285,16 +310,35 @@ export const updateCourse = async (courseId, updateData) => {
     payload.totalLessons = payload.lessonIds.length;
   }
 
-  return await Course.findByIdAndUpdate(courseId, payload, {
+  const updatedCourse = await Course.findByIdAndUpdate(courseId, payload, {
     new: true,
+    runValidators: true,
   })
     .populate("instructorId")
     .populate({
       path: "lessonIds",
       options: { sort: { order: 1, createdAt: 1 } },
     });
+
+  return updatedCourse;
 };
 
-export const deleteCourse = async (courseId) => {
+export const deleteCourse = async (
+  courseId,
+  { requesterId, requesterRole } = {}
+) => {
+  const existingCourse = await Course.findById(courseId);
+
+  if (!existingCourse) {
+    throw new Error("Course not found");
+  }
+
+  if (
+    requesterRole !== "admin" &&
+    String(existingCourse.instructorId) !== String(requesterId)
+  ) {
+    throw new Error("You are not allowed to delete this course");
+  }
+
   return await Course.findByIdAndDelete(courseId);
 };

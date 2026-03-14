@@ -9,18 +9,37 @@ function generateCertificateCode(courseId, studentId) {
     .toUpperCase()}-${Date.now()}`;
 }
 
-export const generateCertificate = async ({ studentId, courseId, studentName }) => {
+export const generateCertificate = async ({
+  studentId,
+  courseId,
+  studentName,
+}) => {
+  if (!studentId || !courseId) {
+    throw new Error("studentId and courseId are required");
+  }
+
   const enrollment = await Enrollment.findOne({ studentId, courseId });
-  if (!enrollment) throw new Error("Enrollment not found");
+  if (!enrollment) {
+    throw new Error("Enrollment not found");
+  }
+
   if (Number(enrollment.progress) < 100 && !enrollment.completed) {
     throw new Error("Course not completed");
   }
 
-  const existed = await Certificate.findOne({ studentId, courseId });
-  if (existed) return existed;
+  const existed = await Certificate.findOne({ studentId, courseId })
+    .populate("studentId")
+    .populate("courseId")
+    .populate("instructorId");
+
+  if (existed) {
+    return existed;
+  }
 
   const course = await Course.findById(courseId);
-  if (!course) throw new Error("Course not found");
+  if (!course) {
+    throw new Error("Course not found");
+  }
 
   const user = await User.findById(studentId);
 
@@ -35,23 +54,47 @@ export const generateCertificate = async ({ studentId, courseId, studentName }) 
     issuedAt: new Date(),
   });
 
-  return cert;
+  return Certificate.findById(cert._id)
+    .populate("studentId")
+    .populate("courseId")
+    .populate("instructorId");
 };
 
 export const getCertificateByCourseStudent = async (courseId, studentId) => {
-  const cert = await Certificate.findOne({ courseId, studentId });
-  if (!cert) throw new Error("Certificate not found");
+  const cert = await Certificate.findOne({ courseId, studentId })
+    .populate("studentId")
+    .populate("courseId")
+    .populate("instructorId");
+
+  if (!cert) {
+    throw new Error("Certificate not found");
+  }
+
   return cert;
 };
 
 export const getCertificateById = async (certificateId) => {
-  const cert = await Certificate.findById(certificateId);
-  if (!cert) throw new Error("Certificate not found");
+  const cert = await Certificate.findById(certificateId)
+    .populate("studentId")
+    .populate("courseId")
+    .populate("instructorId");
+
+  if (!cert) {
+    throw new Error("Certificate not found");
+  }
+
   return cert;
 };
 
 export const getCertificateByCode = async (certificateCode) => {
-  const cert = await Certificate.findOne({ certificateCode });
-  if (!cert) throw new Error("Certificate not found");
+  const cert = await Certificate.findOne({ certificateCode })
+    .populate("studentId")
+    .populate("courseId")
+    .populate("instructorId");
+
+  if (!cert) {
+    throw new Error("Certificate not found");
+  }
+
   return cert;
 };

@@ -4,18 +4,27 @@ import Button from "../../../shared/components/Button";
 export default function ReviewForm({ courseId, onSubmit }) {
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
-    onSubmit({
-      courseId,
-      rating: Number(rating),
-      comment: comment.trim(),
-    });
+    if (!courseId || typeof onSubmit !== "function") return;
 
-    setComment("");
-    setRating(5);
+    try {
+      setSubmitting(true);
+
+      await onSubmit({
+        courseId,
+        rating: Number(rating),
+        comment: comment.trim(),
+      });
+
+      setComment("");
+      setRating(5);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -56,7 +65,9 @@ export default function ReviewForm({ courseId, onSubmit }) {
       </div>
 
       <div className="mt-4">
-        <Button type="submit">Gửi đánh giá</Button>
+        <Button type="submit" loading={submitting} disabled={submitting}>
+          Gửi đánh giá
+        </Button>
       </div>
     </form>
   );

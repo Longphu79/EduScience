@@ -150,4 +150,4 @@ export function Hero() {
       </div>
     </section>
   );
-}
+}   

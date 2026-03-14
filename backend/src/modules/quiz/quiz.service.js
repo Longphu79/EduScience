@@ -77,20 +77,56 @@ function sanitizeQuestion(question = {}) {
     type: question.type || "single",
     explanation: question.explanation?.trim() || "",
     points: Number(question.points) > 0 ? Number(question.points) : 1,
-    options: (Array.isArray(question.options) ? question.options : []).map((opt) => ({
-      text: opt.text?.trim() || "",
-      isCorrect: !!opt.isCorrect,
-    })),
+    options: (Array.isArray(question.options) ? question.options : []).map(
+      (opt) => ({
+        text: opt.text?.trim() || "",
+        isCorrect: !!opt.isCorrect,
+      })
+    ),
   };
 }
 
-export const createQuiz = async (payload) => {
-  const course = await Course.findById(payload.courseId).lean();
+async function ensureCourseOwnership(courseId, { requesterId, requesterRole } = {}) {
+  const course = await Course.findById(courseId).lean();
+
   if (!course) throw new Error("Course not found");
 
-  if (String(course.instructorId) !== String(payload.instructorId)) {
-    throw new Error("You are not allowed to create quiz for this course");
+  if (
+    requesterRole !== "admin" &&
+    String(course.instructorId) !== String(requesterId)
+  ) {
+    throw new Error("You are not allowed to manage quizzes of this course");
   }
+
+  return course;
+}
+
+async function ensureQuizOwnership(quizId, { requesterId, requesterRole } = {}) {
+  const quiz = await Quiz.findById(quizId).lean();
+  if (!quiz) throw new Error("Quiz not found");
+
+  if (
+    requesterRole !== "admin" &&
+    String(quiz.instructorId) !== String(requesterId)
+  ) {
+    throw new Error("You are not allowed to manage this quiz");
+  }
+
+  return quiz;
+}
+
+export const createQuiz = async (
+  payload,
+  { requesterId, requesterRole } = {}
+) => {
+  if (!payload?.courseId) {
+    throw new Error("courseId is required");
+  }
+
+  await ensureCourseOwnership(payload.courseId, {
+    requesterId,
+    requesterRole,
+  });
 
   const questions = (payload.questions || []).map(sanitizeQuestion);
   validateQuestions(questions);
@@ -100,7 +136,10 @@ export const createQuiz = async (payload) => {
     description: payload.description?.trim() || "",
     courseId: payload.courseId,
     lessonId: payload.lessonId || null,
-    instructorId: payload.instructorId,
+    instructorId:
+      requesterRole === "admin"
+        ? payload.instructorId || requesterId
+        : requesterId,
     timeLimit: Number(payload.timeLimit) || 0,
     passingScore: Number(payload.passingScore) || 0,
     isPublished:
@@ -112,22 +151,20 @@ export const createQuiz = async (payload) => {
     throw new Error("Quiz title is required");
   }
 
-  return Quiz.create(quizPayload);
+  return await Quiz.create(quizPayload);
 };
 
 export const getQuizByCourse = async (courseId) => {
-  return Quiz.find({ courseId, isPublished: true }).sort({ createdAt: 1 });
+  return await Quiz.find({ courseId, isPublished: true }).sort({ createdAt: 1 });
 };
 
-export const getInstructorQuizzesByCourse = async (courseId, instructorId) => {
-  const course = await Course.findById(courseId).lean();
-  if (!course) throw new Error("Course not found");
+export const getInstructorQuizzesByCourse = async (
+  courseId,
+  { requesterId, requesterRole } = {}
+) => {
+  await ensureCourseOwnership(courseId, { requesterId, requesterRole });
 
-  if (String(course.instructorId) !== String(instructorId)) {
-    throw new Error("You are not allowed to view quizzes of this course");
-  }
-
-  const quizzes = await Quiz.find({ courseId, instructorId })
+  const quizzes = await Quiz.find({ courseId })
     .sort({ createdAt: 1 })
     .lean();
 
@@ -314,16 +351,17 @@ export const getAttemptReviewById = async (attemptId, studentId) => {
   };
 };
 
-export const getQuizResultsByQuizId = async (quizId, instructorId) => {
-  const quiz = await Quiz.findById(quizId).lean();
-  if (!quiz) throw new Error("Quiz not found");
-
-  if (String(quiz.instructorId) !== String(instructorId)) {
-    throw new Error("You are not allowed to view results of this quiz");
-  }
+export const getQuizResultsByQuizId = async (
+  quizId,
+  { requesterId, requesterRole } = {}
+) => {
+  const quiz = await ensureQuizOwnership(quizId, {
+    requesterId,
+    requesterRole,
+  });
 
   const attempts = await QuizAttempt.find({ quizId })
-    .populate("studentId", "username email avatarUrl")
+    .populate("studentId", "username email avatarUrl fullName")
     .sort({ submittedAt: -1, createdAt: -1 })
     .lean();
 
@@ -343,11 +381,15 @@ export const getQuizResultsByQuizId = async (quizId, instructorId) => {
 
   attempts.forEach((attempt) => {
     const key = String(attempt.studentId?._id || attempt.studentId);
+
     if (!studentMap.has(key)) {
       studentMap.set(key, {
         studentId: attempt.studentId?._id || attempt.studentId,
         studentName:
-          attempt.studentId?.username || attempt.studentId?.email || "Student",
+          attempt.studentId?.fullName ||
+          attempt.studentId?.username ||
+          attempt.studentId?.email ||
+          "Student",
         studentEmail: attempt.studentId?.email || "",
         attemptCount: 0,
         latestScore: 0,
@@ -402,17 +444,15 @@ export const getQuizResultsByQuizId = async (quizId, instructorId) => {
 export const getQuizAttemptsByQuizAndStudent = async (
   quizId,
   studentId,
-  instructorId
+  { requesterId, requesterRole } = {}
 ) => {
-  const quiz = await Quiz.findById(quizId).lean();
-  if (!quiz) throw new Error("Quiz not found");
-
-  if (String(quiz.instructorId) !== String(instructorId)) {
-    throw new Error("You are not allowed to view attempts of this quiz");
-  }
+  await ensureQuizOwnership(quizId, {
+    requesterId,
+    requesterRole,
+  });
 
   const attempts = await QuizAttempt.find({ quizId, studentId })
-    .populate("studentId", "username email avatarUrl")
+    .populate("studentId", "username email avatarUrl fullName")
     .sort({ submittedAt: -1, createdAt: -1 })
     .lean();
 
@@ -421,7 +461,10 @@ export const getQuizAttemptsByQuizAndStudent = async (
     quizId: attempt.quizId,
     studentId: attempt.studentId?._id || attempt.studentId,
     studentName:
-      attempt.studentId?.username || attempt.studentId?.email || "Student",
+      attempt.studentId?.fullName ||
+      attempt.studentId?.username ||
+      attempt.studentId?.email ||
+      "Student",
     studentEmail: attempt.studentId?.email || "",
     score: attempt.score || 0,
     passed: !!attempt.passed,
@@ -432,10 +475,13 @@ export const getQuizAttemptsByQuizAndStudent = async (
   }));
 };
 
-export const getInstructorAttemptReviewById = async (attemptId, instructorId) => {
+export const getInstructorAttemptReviewById = async (
+  attemptId,
+  { requesterId, requesterRole } = {}
+) => {
   const attempt = await QuizAttempt.findById(attemptId)
     .populate("quizId", "title instructorId courseId")
-    .populate("studentId", "username email avatarUrl")
+    .populate("studentId", "username email avatarUrl fullName")
     .lean();
 
   if (!attempt) throw new Error("Quiz attempt not found");
@@ -443,7 +489,10 @@ export const getInstructorAttemptReviewById = async (attemptId, instructorId) =>
   const quizInstructorId =
     attempt.quizId?.instructorId?._id || attempt.quizId?.instructorId;
 
-  if (String(quizInstructorId) !== String(instructorId)) {
+  if (
+    requesterRole !== "admin" &&
+    String(quizInstructorId) !== String(requesterId)
+  ) {
     throw new Error("You are not allowed to review this attempt");
   }
 
@@ -454,7 +503,10 @@ export const getInstructorAttemptReviewById = async (attemptId, instructorId) =>
     courseId: attempt.quizId?.courseId || attempt.courseId,
     studentId: attempt.studentId?._id || attempt.studentId,
     studentName:
-      attempt.studentId?.username || attempt.studentId?.email || "Student",
+      attempt.studentId?.fullName ||
+      attempt.studentId?.username ||
+      attempt.studentId?.email ||
+      "Student",
     studentEmail: attempt.studentId?.email || "",
     score: attempt.score || 0,
     passed: !!attempt.passed,
@@ -465,16 +517,15 @@ export const getInstructorAttemptReviewById = async (attemptId, instructorId) =>
   };
 };
 
-export const updateQuiz = async (quizId, payload) => {
-  const existingQuiz = await Quiz.findById(quizId).lean();
-  if (!existingQuiz) throw new Error("Quiz not found");
-
-  if (
-    payload.instructorId &&
-    String(existingQuiz.instructorId) !== String(payload.instructorId)
-  ) {
-    throw new Error("You are not allowed to update this quiz");
-  }
+export const updateQuiz = async (
+  quizId,
+  payload,
+  { requesterId, requesterRole } = {}
+) => {
+  const existingQuiz = await ensureQuizOwnership(quizId, {
+    requesterId,
+    requesterRole,
+  });
 
   if (payload.patchMode) {
     const updated = await Quiz.findByIdAndUpdate(
@@ -522,13 +573,17 @@ export const updateQuiz = async (quizId, payload) => {
   return updated;
 };
 
-export const deleteQuiz = async (quizId, instructorId) => {
+export const deleteQuiz = async (
+  quizId,
+  { requesterId, requesterRole } = {}
+) => {
+  await ensureQuizOwnership(quizId, {
+    requesterId,
+    requesterRole,
+  });
+
   const quiz = await Quiz.findById(quizId).lean();
   if (!quiz) throw new Error("Quiz not found");
-
-  if (instructorId && String(quiz.instructorId) !== String(instructorId)) {
-    throw new Error("You are not allowed to delete this quiz");
-  }
 
   await Quiz.findByIdAndDelete(quizId);
   await QuizAttempt.deleteMany({ quizId });

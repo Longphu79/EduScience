@@ -9,7 +9,6 @@ import {
 } from "../services/assignment.service";
 import Toast from "../../../shared/components/Toast";
 import Button from "../../../shared/components/Button";
-import { useAuth } from "../../auth/state/useAuth";
 
 const initialForm = {
   title: "",
@@ -23,7 +22,6 @@ const initialForm = {
 
 export default function InstructorAssignmentManagePage() {
   const { courseId } = useParams();
-  const { user } = useAuth();
 
   const [assignments, setAssignments] = useState([]);
   const [form, setForm] = useState(initialForm);
@@ -33,8 +31,6 @@ export default function InstructorAssignmentManagePage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [toast, setToast] = useState({ message: "", kind: "success" });
-
-  const instructorId = user?._id || user?.id || user?.userId || null;
 
   async function loadAssignments() {
     try {
@@ -82,20 +78,11 @@ export default function InstructorAssignmentManagePage() {
       return;
     }
 
-    if (!instructorId) {
-      setToast({
-        message: "Không tìm thấy instructorId từ tài khoản đăng nhập",
-        kind: "error",
-      });
-      return;
-    }
-
     try {
       setSaving(true);
 
       const payload = {
         courseId,
-        instructorId,
         title: form.title.trim(),
         description: form.description.trim(),
         dueDate: form.dueDate || null,

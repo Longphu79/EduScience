@@ -32,25 +32,28 @@ import InstructorAssignmentManagePage from "./features/assignment/pages/Instruct
 import InstructorAssignmentResultsPage from "./features/assignment/pages/InstructorAssignmentResultsPage.jsx";
 
 import CourseChatPage from "./features/chat/pages/CourseChatPage.jsx";
+import CourseCertificatePage from "./features/certificate/pages/CourseCertificatePage.jsx";
+import PublicCertificatePage from "./features/certificate/pages/PublicCertificatePage.jsx";
+import CartPage from "./features/cart/pages/CartPage.jsx";
+
 import { useAuth } from "./features/auth/state/useAuth.jsx";
 
 import FeaturesPage from "./pages/features/Features.jsx";
 import AboutPage from "./pages/aboutus/about.jsx";
 
+function LoadingScreen() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-10">
+      <p>Loading...</p>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }) {
   const { isAuthenticated, booting } = useAuth();
 
-  if (booting) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/auth/login" replace />;
-  }
+  if (booting) return <LoadingScreen />;
+  if (!isAuthenticated) return <Navigate to="/auth/login" replace />;
 
   return children;
 }
@@ -58,21 +61,9 @@ function ProtectedRoute({ children }) {
 function InstructorRoute({ children }) {
   const { isAuthenticated, user, booting } = useAuth();
 
-  if (booting) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/auth/login" replace />;
-  }
-
-  if (user?.role !== "instructor") {
-    return <Navigate to="/" replace />;
-  }
+  if (booting) return <LoadingScreen />;
+  if (!isAuthenticated) return <Navigate to="/auth/login" replace />;
+  if (user?.role !== "instructor") return <Navigate to="/" replace />;
 
   return children;
 }
@@ -80,17 +71,8 @@ function InstructorRoute({ children }) {
 function PublicOnlyRoute({ children }) {
   const { isAuthenticated, booting } = useAuth();
 
-  if (booting) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        <p>Loading...</p>
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
+  if (booting) return <LoadingScreen />;
+  if (isAuthenticated) return <Navigate to="/" replace />;
 
   return children;
 }
@@ -112,6 +94,15 @@ function App() {
           <Route path="courses/:courseId" element={<CourseDetailPage />} />
 
           <Route
+            path="cart"
+            element={
+              <ProtectedRoute>
+                <CartPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="my-courses"
             element={
               <ProtectedRoute>
@@ -125,6 +116,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <LearnCoursePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="learn/:courseId/certificate"
+            element={
+              <ProtectedRoute>
+                <CourseCertificatePage />
               </ProtectedRoute>
             }
           />
@@ -145,6 +145,12 @@ function App() {
                 <CourseChatPage />
               </ProtectedRoute>
             }
+          />
+
+          <Route path="certificate/:code" element={<PublicCertificatePage />} />
+          <Route
+            path="certificate/public/:code"
+            element={<PublicCertificatePage />}
           />
 
           <Route
@@ -260,6 +266,15 @@ function App() {
             element={
               <InstructorRoute>
                 <InstructorStudentDetailPage />
+              </InstructorRoute>
+            }
+          />
+
+          <Route
+            path="instructor/courses/:courseId/chat"
+            element={
+              <InstructorRoute>
+                <CourseChatPage />
               </InstructorRoute>
             }
           />

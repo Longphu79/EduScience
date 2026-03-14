@@ -3,14 +3,36 @@ import Course from "../course/course.model.js";
 import QuizAttempt from "../quiz/quizAttempt.model.js";
 import AssignmentSubmission from "../assignment/assignmentSubmission.model.js";
 
-export const enrollCourse = async ({ studentId, courseId }) => {
+const lessonPopulateConfig = {
+  path: "lessonIds",
+  match: { isPublished: true },
+  options: { sort: { order: 1, createdAt: 1 } },
+};
+
+async function getPublishedCourseWithLessons(courseId) {
+  return Course.findById(courseId).populate(lessonPopulateConfig);
+}
+
+function toStringId(value) {
+  return String(value?._id || value || "");
+}
+
+function calcProgress(totalLessons, completedLessonsCount) {
+  if (!totalLessons || totalLessons <= 0) return 0;
+  return Math.min(
+    100,
+    Math.round((Number(completedLessonsCount || 0) / Number(totalLessons)) * 100)
+  );
+}
+
+export const createEnrollmentRecord = async ({ studentId, courseId }) => {
   if (!studentId || !courseId) {
     throw new Error("studentId and courseId are required");
   }
 
   const existed = await Enrollment.findOne({ studentId, courseId });
   if (existed) {
-    throw new Error("You already enrolled in this course");
+    return existed;
   }
 
   const course = await Course.findById(courseId);
@@ -38,26 +60,48 @@ export const enrollCourse = async ({ studentId, courseId }) => {
   return enrollment;
 };
 
+export const enrollCourse = async ({ studentId, courseId }) => {
+  if (!studentId || !courseId) {
+    throw new Error("studentId and courseId are required");
+  }
+
+  const existed = await Enrollment.findOne({ studentId, courseId });
+  if (existed) {
+    throw new Error("You already enrolled in this course");
+  }
+
+  const course = await Course.findById(courseId);
+  if (!course) {
+    throw new Error("Course not found");
+  }
+
+  if (course.status !== "published") {
+    throw new Error("Course is not available for enrollment");
+  }
+
+  const isFreeCourse =
+    course.isFree === true || Number(course.price || 0) === 0;
+
+  if (!isFreeCourse) {
+    throw new Error(
+      "Paid course must be purchased through cart checkout before enrollment"
+    );
+  }
+
+  return await createEnrollmentRecord({ studentId, courseId });
+};
+
 export const getMyCourses = async (studentId) => {
-  return await Enrollment.find({ studentId })
+  return Enrollment.find({ studentId })
     .populate({
       path: "courseId",
-      populate: [
-        {
-          path: "instructorId",
-        },
-        {
-          path: "lessonIds",
-          match: { isPublished: true },
-          options: { sort: { order: 1, createdAt: 1 } },
-        },
-      ],
+      populate: [{ path: "instructorId" }, lessonPopulateConfig],
     })
     .sort({ createdAt: -1 });
 };
 
 export const getInstructorCourses = async (instructorId) => {
-  return await Course.find({ instructorId })
+  return Course.find({ instructorId })
     .populate("instructorId")
     .populate({
       path: "lessonIds",
@@ -67,16 +111,9 @@ export const getInstructorCourses = async (instructorId) => {
 };
 
 export const getEnrollmentByStudentAndCourse = async (studentId, courseId) => {
-  return await Enrollment.findOne({ studentId, courseId }).populate({
+  return Enrollment.findOne({ studentId, courseId }).populate({
     path: "courseId",
-    populate: [
-      { path: "instructorId" },
-      {
-        path: "lessonIds",
-        match: { isPublished: true },
-        options: { sort: { order: 1, createdAt: 1 } },
-      },
-    ],
+    populate: [{ path: "instructorId" }, lessonPopulateConfig],
   });
 };
 
@@ -86,15 +123,32 @@ export const setCurrentLesson = async ({ studentId, courseId, lessonId }) => {
   }
 
   const enrollment = await Enrollment.findOne({ studentId, courseId });
-
   if (!enrollment) {
     throw new Error("Enrollment not found");
+  }
+
+  const course = await getPublishedCourseWithLessons(courseId);
+  if (!course) {
+    throw new Error("Course not found");
+  }
+
+  const lessonExists = Array.isArray(course.lessonIds)
+    ? course.lessonIds.some(
+        (lesson) => String(lesson._id) === String(lessonId)
+      )
+    : false;
+
+  if (!lessonExists) {
+    throw new Error("Lesson not found in this course");
   }
 
   enrollment.lastLessonId = lessonId;
   await enrollment.save();
 
-  return enrollment;
+  return Enrollment.findById(enrollment._id).populate({
+    path: "courseId",
+    populate: [{ path: "instructorId" }, lessonPopulateConfig],
+  });
 };
 
 export const completeLesson = async ({ studentId, courseId, lessonId }) => {
@@ -102,23 +156,29 @@ export const completeLesson = async ({ studentId, courseId, lessonId }) => {
     throw new Error("studentId, courseId and lessonId are required");
   }
 
-  const enrollment = await Enrollment.findOne({ studentId, courseId }).populate({
-    path: "courseId",
-    populate: {
-      path: "lessonIds",
-      match: { isPublished: true },
-      options: { sort: { order: 1, createdAt: 1 } },
-    },
-  });
-
+  const enrollment = await Enrollment.findOne({ studentId, courseId });
   if (!enrollment) {
     throw new Error("Enrollment not found");
+  }
+
+  const course = await getPublishedCourseWithLessons(courseId);
+  if (!course) {
+    throw new Error("Course not found");
+  }
+
+  const publishedLessons = Array.isArray(course.lessonIds) ? course.lessonIds : [];
+  const lessonExists = publishedLessons.some(
+    (lesson) => String(lesson._id) === String(lessonId)
+  );
+
+  if (!lessonExists) {
+    throw new Error("Lesson not found in this course");
   }
 
   const lessonIdStr = String(lessonId);
 
   const existingCompletedIds = Array.isArray(enrollment.completedLessons)
-    ? enrollment.completedLessons.map((item) => String(item))
+    ? enrollment.completedLessons.map((item) => toStringId(item))
     : [];
 
   if (!existingCompletedIds.includes(lessonIdStr)) {
@@ -127,70 +187,79 @@ export const completeLesson = async ({ studentId, courseId, lessonId }) => {
 
   enrollment.lastLessonId = lessonId;
 
-  const totalLessons = enrollment.courseId?.lessonIds?.length || 0;
-  const completedLessonsCount = enrollment.completedLessons.length;
+  const completedUniqueCount = new Set(
+    enrollment.completedLessons.map((item) => toStringId(item))
+  ).size;
 
-  enrollment.progress =
-    totalLessons > 0
-      ? Math.min(100, Math.round((completedLessonsCount / totalLessons) * 100))
-      : 0;
+  const totalLessons = publishedLessons.length;
+  const progress = calcProgress(totalLessons, completedUniqueCount);
 
-  enrollment.completed =
-    totalLessons > 0 && completedLessonsCount >= totalLessons;
+  enrollment.progress = progress;
+  enrollment.completed = totalLessons > 0 && completedUniqueCount >= totalLessons;
 
   await enrollment.save();
 
-  return await Enrollment.findById(enrollment._id).populate({
+  return Enrollment.findById(enrollment._id).populate({
     path: "courseId",
-    populate: [
-      { path: "instructorId" },
-      {
-        path: "lessonIds",
-        match: { isPublished: true },
-        options: { sort: { order: 1, createdAt: 1 } },
-      },
-    ],
+    populate: [{ path: "instructorId" }, lessonPopulateConfig],
   });
 };
 
-export const getStudentsByCourse = async (courseId) => {
+export const getStudentsByCourse = async (
+  courseId,
+  { requesterId, requesterRole } = {}
+) => {
   if (!courseId) {
     throw new Error("courseId is required");
   }
 
-  return await Enrollment.find({ courseId })
+  const course = await Course.findById(courseId);
+  if (!course) {
+    throw new Error("Course not found");
+  }
+
+  if (
+    requesterRole !== "admin" &&
+    String(course.instructorId) !== String(requesterId)
+  ) {
+    throw new Error("You are not allowed to view students of this course");
+  }
+
+  return Enrollment.find({ courseId })
     .populate("studentId")
     .populate({
       path: "courseId",
-      populate: [
-        { path: "instructorId" },
-        {
-          path: "lessonIds",
-          match: { isPublished: true },
-          options: { sort: { order: 1, createdAt: 1 } },
-        },
-      ],
+      populate: [{ path: "instructorId" }, lessonPopulateConfig],
     })
     .sort({ createdAt: -1 });
 };
 
-export const getStudentProgressDetail = async (courseId, studentId) => {
+export const getStudentProgressDetail = async (
+  courseId,
+  studentId,
+  { requesterId, requesterRole } = {}
+) => {
   if (!courseId || !studentId) {
     throw new Error("courseId and studentId are required");
+  }
+
+  const course = await Course.findById(courseId).populate(lessonPopulateConfig);
+  if (!course) {
+    throw new Error("Course not found");
+  }
+
+  if (
+    requesterRole !== "admin" &&
+    String(course.instructorId) !== String(requesterId)
+  ) {
+    throw new Error("You are not allowed to view student progress of this course");
   }
 
   const enrollment = await Enrollment.findOne({ courseId, studentId })
     .populate("studentId")
     .populate({
       path: "courseId",
-      populate: [
-        { path: "instructorId" },
-        {
-          path: "lessonIds",
-          match: { isPublished: true },
-          options: { sort: { order: 1, createdAt: 1 } },
-        },
-      ],
+      populate: [{ path: "instructorId" }, lessonPopulateConfig],
     });
 
   if (!enrollment) {
@@ -208,8 +277,18 @@ export const getStudentProgressDetail = async (courseId, studentId) => {
     .populate("assignmentId")
     .sort({ createdAt: -1 });
 
+  const totalLessons = Array.isArray(course.lessonIds) ? course.lessonIds.length : 0;
+  const completedLessonsCount = new Set(
+    (enrollment.completedLessons || []).map((item) => toStringId(item))
+  ).size;
+
   return {
     enrollment,
+    totalLessons,
+    completedLessonsCount,
+    progressPercent: calcProgress(totalLessons, completedLessonsCount),
+    isCompleted:
+      totalLessons > 0 && completedLessonsCount >= totalLessons,
     quizAttempts,
     assignmentSubmissions,
   };

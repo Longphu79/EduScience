@@ -3,7 +3,53 @@ const API_BASE_URL =
   import.meta.env.VITE_API_URL ||
   "http://localhost:4000";
 
-async function handleResponse(res, fallbackMessage) {
+function getAuthToken() {
+  try {
+    const directToken =
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("authToken");
+
+    if (directToken) return directToken;
+
+    const authRaw =
+      localStorage.getItem("auth") ||
+      localStorage.getItem("auth-storage") ||
+      localStorage.getItem("eduscience_auth");
+
+    if (authRaw) {
+      const parsed = JSON.parse(authRaw);
+      return (
+        parsed?.token ||
+        parsed?.accessToken ||
+        parsed?.state?.token ||
+        parsed?.state?.accessToken ||
+        null
+      );
+    }
+  } catch (error) {
+    console.error("getAuthToken error:", error);
+  }
+
+  return null;
+}
+
+function createHeaders(extraHeaders = {}, useAuth = false) {
+  const headers = {
+    ...extraHeaders,
+  };
+
+  if (useAuth) {
+    const token = getAuthToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
+  return headers;
+}
+
+async function handleResponse(res, fallbackMessage = "Request failed") {
   const data = await res.json().catch(() => null);
 
   if (!res.ok) {
@@ -21,8 +67,8 @@ export function courseUnwrap(payload) {
 }
 
 function mapSortValue(sort) {
-  if (sort === "priceAsc") return "price-low";
-  if (sort === "priceDesc") return "price-high";
+  if (sort === "priceAsc") return "priceAsc";
+  if (sort === "priceDesc") return "priceDesc";
   return sort;
 }
 
@@ -32,9 +78,8 @@ export async function getAllCourses(params = {}) {
   if (normalized.category === "All") delete normalized.category;
   if (normalized.level === "All") delete normalized.level;
 
-  if (normalized.sortBy && !normalized.sort) {
-    normalized.sort = mapSortValue(normalized.sortBy);
-    delete normalized.sortBy;
+  if (normalized.sortBy) {
+    normalized.sortBy = mapSortValue(normalized.sortBy);
   }
 
   const query = new URLSearchParams(normalized).toString();
@@ -63,40 +108,51 @@ export async function getCourseBySlug(slug) {
 }
 
 export async function getInstructorCourses(instructorId) {
-  const res = await fetch(`${API_BASE_URL}/course/instructor/${instructorId}`);
+  const res = await fetch(`${API_BASE_URL}/course/instructor/${instructorId}`, {
+    headers: createHeaders({}, true),
+  });
   return handleResponse(res, "Failed to fetch instructor courses");
 }
 
 export async function createCourse(payload) {
+  const cleanPayload = { ...payload };
+  delete cleanPayload.instructorId;
+  delete cleanPayload._id;
+  delete cleanPayload.rating;
+  delete cleanPayload.totalReviews;
+  delete cleanPayload.totalEnrollments;
+
   const res = await fetch(`${API_BASE_URL}/course`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    headers: createHeaders({ "Content-Type": "application/json" }, true),
+    body: JSON.stringify(cleanPayload),
   });
+
   return handleResponse(res, "Failed to create course");
 }
 
 export async function updateCourse(courseId, payload) {
+  const cleanPayload = { ...payload };
+  delete cleanPayload.instructorId;
+  delete cleanPayload._id;
+  delete cleanPayload.rating;
+  delete cleanPayload.totalReviews;
+  delete cleanPayload.totalEnrollments;
+
   const res = await fetch(`${API_BASE_URL}/course/${courseId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    headers: createHeaders({ "Content-Type": "application/json" }, true),
+    body: JSON.stringify(cleanPayload),
   });
+
   return handleResponse(res, "Failed to update course");
 }
 
 export async function deleteCourse(courseId) {
   const res = await fetch(`${API_BASE_URL}/course/${courseId}`, {
     method: "DELETE",
+    headers: createHeaders({}, true),
   });
-  return handleResponse(res, "Failed to delete course");
-}
 
-export async function enrollCourse(payload) {
-  const res = await fetch(`${API_BASE_URL}/enrollment/enroll`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return handleResponse(res, "Failed to enroll course");
+  return handleResponse(res, "Failed to delete course");
 }

@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Toast from "../../../shared/components/Toast";
-import { useAuth } from "../../auth/state/useAuth";
 import { createCourse, courseUnwrap } from "../services/course.service";
 
 const initialForm = {
@@ -33,11 +32,6 @@ function makeSlug(text = "") {
 
 export default function CreateCoursePage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-
-  const instructorId = useMemo(() => {
-    return user?._id || user?.id || user?.userId || null;
-  }, [user]);
 
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
@@ -77,14 +71,6 @@ export default function CreateCoursePage() {
     e.preventDefault();
 
     try {
-      if (!instructorId) {
-        setToast({
-          message: "Instructor id not found. Please login again.",
-          kind: "error",
-        });
-        return;
-      }
-
       if (!form.title.trim()) {
         setToast({
           message: "Course title is required",
@@ -105,7 +91,6 @@ export default function CreateCoursePage() {
 
       const payload = {
         ...form,
-        instructorId,
       };
 
       const createdRes = await createCourse(payload);

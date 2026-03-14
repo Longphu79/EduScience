@@ -31,7 +31,7 @@ export default function AllCoursesPage() {
   const [sortBy, setSortBy] = useState("popular");
   const [toast, setToast] = useState({
     message: "",
-    kind: "success",
+    type: "success",
   });
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +64,7 @@ export default function AllCoursesPage() {
         console.error(error);
         setToast({
           message: error.message || "Failed to load courses",
-          kind: "error",
+          type: "error",
         });
         setCourses([]);
       } finally {
@@ -94,9 +94,9 @@ export default function AllCoursesPage() {
   return (
     <div className="courses-page">
       <Toast
-        kind={toast.kind}
+        type={toast.type}
         message={toast.message}
-        onClose={() => setToast({ message: "", kind: "success" })}
+        onClose={() => setToast({ message: "", type: "success" })}
       />
 
       <div className="courses-bg-orb orb-1" />
@@ -137,7 +137,7 @@ export default function AllCoursesPage() {
               onClick={() =>
                 setToast({
                   message: "Start exploring our premium courses!",
-                  kind: "success",
+                  type: "success",
                 })
               }
             >

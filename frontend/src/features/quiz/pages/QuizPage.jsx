@@ -19,8 +19,7 @@ function formatTime(seconds) {
 function buildInitialAnswers(questions = []) {
   const result = {};
   questions.forEach((question) => {
-    result[String(question._id)] =
-      question.type === "multiple" ? [] : [];
+    result[String(question._id)] = [];
   });
   return result;
 }
@@ -73,26 +72,10 @@ export default function QuizPage() {
       try {
         setLoading(true);
 
-        const [quizRes, attemptRes] = await Promise.all([
-          getQuizById(quizId, { hideAnswers: true }),
-          studentId
-            ? getAttemptsByStudentCourse(studentId, courseId)
-            : Promise.resolve([]),
-        ]);
-
+        const quizRes = await getQuizById(quizId, { hideAnswers: true });
         const quizData = quizUnwrap(quizRes);
-        const attemptList = quizUnwrap(attemptRes) || [];
-
-        const filteredAttempts = Array.isArray(attemptList)
-          ? attemptList.filter((item) => {
-              const currentQuizId =
-                item.quizId?._id || item.quizId || item.quiz?._id || item.quiz;
-              return String(currentQuizId) === String(quizId);
-            })
-          : [];
 
         setQuiz(quizData);
-        setAttempts(filteredAttempts);
         setAnswers(buildInitialAnswers(quizData?.questions || []));
 
         if (quizData?.timeLimit) {
@@ -100,9 +83,34 @@ export default function QuizPage() {
         } else {
           setTimeLeft(null);
         }
+
+        if (studentId && courseId) {
+          try {
+            const attemptRes = await getAttemptsByStudentCourse(courseId);
+            const attemptList = quizUnwrap(attemptRes) || [];
+
+            const filteredAttempts = Array.isArray(attemptList)
+              ? attemptList.filter((item) => {
+                  const currentQuizId =
+                    item.quizId?._id ||
+                    item.quizId ||
+                    item.quiz?._id ||
+                    item.quiz;
+                  return String(currentQuizId) === String(quizId);
+                })
+              : [];
+
+            setAttempts(filteredAttempts);
+          } catch (attemptError) {
+            console.error("Load quiz attempts error:", attemptError);
+            setAttempts([]);
+          }
+        } else {
+          setAttempts([]);
+        }
       } catch (error) {
         setToast({
-          message: error.message || "Không tải được quiz",
+          message: error?.message || "Không tải được quiz",
           kind: "error",
         });
       } finally {
@@ -116,7 +124,8 @@ export default function QuizPage() {
   }, [quizId, courseId, studentId]);
 
   useEffect(() => {
-    if (timeLeft === null || showResult) return;
+    if (timeLeft === null || showResult || submitting) return;
+
     if (timeLeft <= 0) {
       handleSubmit(true);
       return;
@@ -127,7 +136,7 @@ export default function QuizPage() {
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [timeLeft, showResult]);
+  }, [timeLeft, showResult, submitting]);
 
   const latestAttempt = useMemo(() => {
     if (!attempts.length) return null;
@@ -181,13 +190,14 @@ export default function QuizPage() {
       }));
 
       const res = await submitQuizAttempt(quizId, {
-        studentId,
         answers: payloadAnswers,
       });
 
       const attempt = quizUnwrap(res);
       setResultAttempt(attempt);
       setShowResult(true);
+
+      setAttempts((prev) => [attempt, ...prev]);
 
       setToast({
         message: autoSubmit
@@ -197,7 +207,7 @@ export default function QuizPage() {
       });
     } catch (error) {
       setToast({
-        message: error.message || "Không thể nộp quiz",
+        message: error?.message || "Không thể nộp quiz",
         kind: "error",
       });
     } finally {
@@ -225,7 +235,7 @@ export default function QuizPage() {
     const summary = normalizeAttemptReview(resultAttempt, quiz);
 
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
         {toast.message ? (
           <Toast
             message={toast.message}
@@ -236,13 +246,11 @@ export default function QuizPage() {
 
         <div className="rounded-3xl border bg-white p-6 shadow-sm">
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-slate-900">
-              {quiz.title}
-            </h1>
+            <h1 className="text-3xl font-bold text-slate-900">{quiz.title}</h1>
             <p className="mt-2 text-slate-600">{quiz.description}</p>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-4 mb-8">
+          <div className="mb-8 grid gap-4 md:grid-cols-4">
             <div className="rounded-2xl border bg-slate-50 p-4">
               <div className="text-sm text-slate-500">Score</div>
               <div className="mt-2 text-3xl font-black text-slate-900">
@@ -315,7 +323,7 @@ export default function QuizPage() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <span className="text-slate-800">{option.text}</span>
 
-                        <div className="flex gap-2 flex-wrap">
+                        <div className="flex flex-wrap gap-2">
                           {option.isSelected ? (
                             <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
                               Student selected
@@ -358,7 +366,9 @@ export default function QuizPage() {
                 setShowResult(false);
                 setResultAttempt(null);
                 setAnswers(buildInitialAnswers(quiz?.questions || []));
-                setTimeLeft(quiz?.timeLimit ? Number(quiz.timeLimit) * 60 : null);
+                setTimeLeft(
+                  quiz?.timeLimit ? Number(quiz.timeLimit) * 60 : null
+                );
               }}
             >
               Retake Quiz
@@ -370,7 +380,7 @@ export default function QuizPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
       {toast.message ? (
         <Toast
           message={toast.message}
@@ -379,7 +389,7 @@ export default function QuizPage() {
         />
       ) : null}
 
-      <div className="rounded-3xl border bg-white shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-3xl border bg-white shadow-sm">
         <div className="border-b p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -411,7 +421,7 @@ export default function QuizPage() {
 
           {latestAttempt ? (
             <div className="mt-5 rounded-2xl border bg-slate-50 p-4 text-sm text-slate-700">
-              <div className="font-semibold text-slate-900 mb-2">
+              <div className="mb-2 font-semibold text-slate-900">
                 Latest attempt
               </div>
               <div>Score: {latestAttempt.score ?? 0}</div>
@@ -435,7 +445,7 @@ export default function QuizPage() {
           ) : null}
         </div>
 
-        <div className="p-6 space-y-8">
+        <div className="space-y-8 p-6">
           {(quiz.questions || []).map((question, index) => {
             const selected = answers[String(question._id)] || [];
 
@@ -459,7 +469,7 @@ export default function QuizPage() {
                     return (
                       <label
                         key={optIndex}
-                        className="flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer hover:bg-slate-50"
+                        className="cursor-pointer rounded-xl border px-4 py-3 hover:bg-slate-50 flex items-start gap-3"
                       >
                         <input
                           type={question.type === "multiple" ? "checkbox" : "radio"}
@@ -484,7 +494,7 @@ export default function QuizPage() {
           })}
         </div>
 
-        <div className="border-t bg-slate-50 p-6 flex gap-3">
+        <div className="flex gap-3 border-t bg-slate-50 p-6">
           <Button
             onClick={() => handleSubmit(false)}
             loading={submitting}

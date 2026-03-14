@@ -6,17 +6,24 @@ import ReviewList from "../../review/components/ReviewList";
 import ReviewForm from "../../review/components/ReviewForm";
 import MaterialList from "../../material/components/MaterialList";
 import {
-  enrollCourse,
   getCourseDetail,
   getAllCourses,
 } from "../services/course.service";
-import { getMyCourses } from "../../enrollment/services/enrollment.service";
+import {
+  getMyCourses,
+  enrollCourse,
+} from "../../enrollment/services/enrollment.service";
 import {
   createReview,
   getReviewsByCourse,
 } from "../../review/services/review.service";
 import { getMaterialsByCourse } from "../../material/services/material.service";
 import { useAuth } from "../../auth/state/useAuth";
+import {
+  addToCart,
+  getMyCart,
+  cartUnwrap,
+} from "../../cart/services/cart.service";
 import "../../../assets/styles/courseDetail.css";
 
 function getYoutubeEmbedUrl(url = "") {
@@ -46,7 +53,9 @@ export default function CourseDetailPage() {
   const [relatedCourses, setRelatedCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [isInCart, setIsInCart] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [extraLoading, setExtraLoading] = useState(true);
@@ -82,6 +91,51 @@ export default function CourseDetailPage() {
     }
   }
 
+  async function loadEnrollmentAndCartState(courseData) {
+    if (!isAuthenticated || !(user?._id || user?.id || user?.userId)) {
+      setIsEnrolled(false);
+      setIsInCart(false);
+      return;
+    }
+
+    const studentId = user._id || user.id || user.userId;
+
+    const [myCoursesRes, myCartRes] = await Promise.allSettled([
+      getMyCourses(studentId),
+      getMyCart(),
+    ]);
+
+    if (myCoursesRes.status === "fulfilled") {
+      const myCourses = myCoursesRes.value?.data || myCoursesRes.value || [];
+
+      const enrolled = Array.isArray(myCourses)
+        ? myCourses.some(
+            (item) =>
+              String(item?.courseId?._id || item?.courseId) ===
+              String(courseData?._id)
+          )
+        : false;
+
+      setIsEnrolled(enrolled);
+    } else {
+      setIsEnrolled(false);
+    }
+
+    if (myCartRes.status === "fulfilled") {
+      const cartData = cartUnwrap(myCartRes.value);
+      const items = Array.isArray(cartData?.items) ? cartData.items : [];
+
+      const existedInCart = items.some(
+        (item) =>
+          String(item?.course?._id || item?.course) === String(courseData?._id)
+      );
+
+      setIsInCart(existedInCart);
+    } else {
+      setIsInCart(false);
+    }
+  }
+
   useEffect(() => {
     async function fetchCourseDetail() {
       try {
@@ -91,30 +145,19 @@ export default function CourseDetailPage() {
         const courseData = data?.data || data;
         setCourse(courseData);
 
-        if (isAuthenticated && (user?._id || user?.id)) {
-          const studentId = user._id || user.id;
-          const myCoursesRes = await getMyCourses(studentId);
-          const myCourses = myCoursesRes?.data || myCoursesRes || [];
-
-          const enrolled = Array.isArray(myCourses)
-            ? myCourses.some(
-                (item) =>
-                  String(item?.courseId?._id || item?.courseId) ===
-                  String(courseData?._id)
-              )
-            : false;
-
-          setIsEnrolled(enrolled);
-        } else {
-          setIsEnrolled(false);
-        }
+        await loadEnrollmentAndCartState(courseData);
 
         const relatedRes = await getAllCourses({
           category: courseData?.category || "",
-          sort: "popular",
+          sortBy: "popular",
         });
 
-        const relatedPayload = relatedRes?.data?.courses || relatedRes?.courses || relatedRes?.data || relatedRes || [];
+        const relatedPayload =
+          relatedRes?.data?.courses ||
+          relatedRes?.courses ||
+          relatedRes?.data ||
+          relatedRes ||
+          [];
 
         setRelatedCourses(
           (Array.isArray(relatedPayload) ? relatedPayload : [])
@@ -125,7 +168,7 @@ export default function CourseDetailPage() {
         await loadExtraData(courseId);
       } catch (error) {
         setToast({
-          message: error.message || "Failed to load course detail",
+          message: error?.message || "Failed to load course detail",
           kind: "error",
         });
       } finally {
@@ -136,8 +179,9 @@ export default function CourseDetailPage() {
     fetchCourseDetail();
   }, [courseId, isAuthenticated, user]);
 
-  const currentUserId = user?._id || user?.id || "";
-  const instructorUserId = course?.instructorId?._id || "";
+  const currentUserId = user?._id || user?.id || user?.userId || "";
+  const instructorUserId =
+    course?.instructorId?._id || course?.instructorId?.id || "";
   const isOwner =
     currentUserId &&
     instructorUserId &&
@@ -187,9 +231,12 @@ export default function CourseDetailPage() {
     return Array.isArray(course?.lessonIds) ? course.lessonIds : [];
   }, [course]);
 
-  async function handleEnroll() {
+  const isFreeCourse =
+    course?.isFree === true || Number(course?.price || 0) === 0;
+
+  async function handleEnrollFree() {
     try {
-      if (!isAuthenticated || !(user?._id || user?.id)) {
+      if (!isAuthenticated || !(user?._id || user?.id || user?.userId)) {
         setToast({
           message: "Please login first",
           kind: "error",
@@ -214,22 +261,27 @@ export default function CourseDetailPage() {
         return;
       }
 
-      if (isEnrolled) {
+      if (!isFreeCourse) {
         setToast({
-          message: "You already enrolled in this course",
-          kind: "success",
+          message: "Paid course must be added to cart and checked out first",
+          kind: "error",
         });
+        return;
+      }
+
+      if (isEnrolled) {
+        navigate(`/learn/${course._id}`);
         return;
       }
 
       setEnrolling(true);
 
       await enrollCourse({
-        studentId: user._id || user.id,
         courseId: course._id,
       });
 
       setIsEnrolled(true);
+      setIsInCart(false);
 
       setCourse((prev) =>
         prev
@@ -241,16 +293,80 @@ export default function CourseDetailPage() {
       );
 
       setToast({
-        message: "Enroll course successfully",
+        message: "Enroll free course successfully",
         kind: "success",
       });
     } catch (error) {
       setToast({
-        message: error.message || "Failed to enroll course",
+        message: error?.message || "Failed to enroll course",
         kind: "error",
       });
     } finally {
       setEnrolling(false);
+    }
+  }
+
+  async function handleAddToCart() {
+    try {
+      if (!isAuthenticated || !(user?._id || user?.id || user?.userId)) {
+        setToast({
+          message: "Please login first",
+          kind: "error",
+        });
+        navigate("/auth/login");
+        return;
+      }
+
+      if (!course?._id) {
+        setToast({
+          message: "Course not found",
+          kind: "error",
+        });
+        return;
+      }
+
+      if (isOwner) {
+        setToast({
+          message: "You are the instructor of this course",
+          kind: "error",
+        });
+        return;
+      }
+
+      if (isFreeCourse) {
+        setToast({
+          message: "Free course does not need cart, please enroll directly",
+          kind: "error",
+        });
+        return;
+      }
+
+      if (isEnrolled) {
+        navigate(`/learn/${course._id}`);
+        return;
+      }
+
+      if (isInCart) {
+        navigate("/cart");
+        return;
+      }
+
+      setAddingToCart(true);
+
+      await addToCart(course._id, 1);
+      setIsInCart(true);
+
+      setToast({
+        message: "Added to cart successfully",
+        kind: "success",
+      });
+    } catch (error) {
+      setToast({
+        message: error?.message || "Failed to add course to cart",
+        kind: "error",
+      });
+    } finally {
+      setAddingToCart(false);
     }
   }
 
@@ -275,7 +391,6 @@ export default function CourseDetailPage() {
 
       await createReview({
         ...payload,
-        studentId: user?._id || user?.id,
       });
 
       await loadExtraData(courseId);
@@ -286,7 +401,7 @@ export default function CourseDetailPage() {
       });
     } catch (error) {
       setToast({
-        message: error.message || "Failed to submit review",
+        message: error?.message || "Failed to submit review",
         kind: "error",
       });
     }
@@ -325,13 +440,38 @@ export default function CourseDetailPage() {
     );
   }
 
+  const primaryButtonText = isOwner
+    ? "Your Course"
+    : isEnrolled
+    ? "Continue Learning"
+    : isFreeCourse
+    ? "Enroll Free"
+    : isInCart
+    ? "Go to Cart"
+    : "Add to Cart";
+
+  const handlePrimaryAction = () => {
+    if (isOwner) return;
+    if (isEnrolled) {
+      navigate(`/learn/${course._id}`);
+      return;
+    }
+    if (isFreeCourse) {
+      handleEnrollFree();
+      return;
+    }
+    handleAddToCart();
+  };
+
   return (
     <div className="course-detail-page">
-      <Toast
-        kind={toast.kind}
-        message={toast.message}
-        onClose={() => setToast({ message: "", kind: "success" })}
-      />
+      {toast.message ? (
+        <Toast
+          kind={toast.kind}
+          message={toast.message}
+          onClose={() => setToast({ message: "", kind: "success" })}
+        />
+      ) : null}
 
       <div className="course-detail-wrapper">
         <div className="course-main-card">
@@ -350,6 +490,8 @@ export default function CourseDetailPage() {
               <span className="meta-chip">{displayLevel}</span>
               <span className="meta-chip">{course.language || "N/A"}</span>
               <span className="meta-chip">{lessons.length} lessons</span>
+              <span className="meta-chip">{isFreeCourse ? "Free" : "Paid"}</span>
+              {course?.isPopular ? <span className="meta-chip">Popular</span> : null}
             </div>
 
             <h1 className="course-title">{course.title}</h1>
@@ -546,14 +688,14 @@ export default function CourseDetailPage() {
               </div>
             </div>
 
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 16, display: "grid", gap: 12 }}>
               <Button
-                onClick={handleEnroll}
-                loading={enrolling}
-                disabled={isEnrolled || isOwner}
+                onClick={handlePrimaryAction}
+                loading={enrolling || addingToCart}
+                disabled={isOwner}
                 className="full-btn"
               >
-                {isOwner ? "Your Course" : isEnrolled ? "Enrolled" : "Enroll Course"}
+                {primaryButtonText}
               </Button>
             </div>
 
@@ -567,6 +709,11 @@ export default function CourseDetailPage() {
               {isEnrolled ? (
                 <Link to={`/learn/${course._id}`} className="continue-btn">
                   Continue Learning
+                </Link>
+              ) : null}
+              {isInCart && !isEnrolled ? (
+                <Link to="/cart" className="continue-btn secondary">
+                  Open Cart
                 </Link>
               ) : null}
             </div>

@@ -11,21 +11,30 @@ import {
   updateAssignment,
   deleteAssignment,
 } from "./assignment.controller.js";
+import { verifyToken } from "../../config/jwt.js";
 
 const router = express.Router();
 
-router.get("/course/:courseId", getAssignmentsByCourse);
-router.get("/:assignmentId", getAssignmentById);
+router.get("/course/:courseId", verifyToken, getAssignmentsByCourse);
+router.get("/:assignmentId", verifyToken, getAssignmentById);
 
-router.post("/", createAssignment);
-router.put("/:assignmentId", updateAssignment);
-router.delete("/:assignmentId", deleteAssignment);
+router.post("/", verifyToken, createAssignment);
+router.put("/:assignmentId", verifyToken, updateAssignment);
+router.delete("/:assignmentId", verifyToken, deleteAssignment);
 
-router.post("/:assignmentId/submit", submitAssignment);
-router.put("/:assignmentId/resubmit", resubmitAssignment);
+router.post("/:assignmentId/submit", verifyToken, submitAssignment);
+router.put("/:assignmentId/resubmit", verifyToken, resubmitAssignment);
 
-router.get("/submission/student/:studentId/course/:courseId", getStudentSubmissions);
-router.get("/submission/assignment/:assignmentId", getSubmissionsByAssignment);
-router.patch("/submission/:submissionId/grade", gradeSubmission);
+router.get(
+  "/submission/student/:studentId/course/:courseId",
+  verifyToken,
+  getStudentSubmissions
+);
+router.get(
+  "/submission/assignment/:assignmentId",
+  verifyToken,
+  getSubmissionsByAssignment
+);
+router.patch("/submission/:submissionId/grade", verifyToken, gradeSubmission);
 
 export default router;

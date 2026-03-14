@@ -22,6 +22,24 @@ const emptyForm = {
   isPublished: true,
 };
 
+function StatCard({ label, value, hint }) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <h3 className="mt-2 text-3xl font-black text-slate-900">{value}</h3>
+      {hint ? <p className="mt-2 text-xs text-slate-400">{hint}</p> : null}
+    </div>
+  );
+}
+
+function normalizeCourseResponse(res) {
+  return res?.data?.data || res?.data || res || null;
+}
+
+function normalizeLessonResponse(res) {
+  return res?.data?.data || res?.data || res || [];
+}
+
 export default function InstructorLessonManagePage() {
   const { courseId } = useParams();
   const { user } = useAuth();
@@ -37,7 +55,10 @@ export default function InstructorLessonManagePage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState("");
   const [editingLessonId, setEditingLessonId] = useState("");
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({
+    ...emptyForm,
+    order: 1,
+  });
   const [toast, setToast] = useState({ message: "", kind: "success" });
 
   async function loadData() {
@@ -49,14 +70,23 @@ export default function InstructorLessonManagePage() {
         getLessonsByCourse(courseId),
       ]);
 
-      const courseData = courseRes?.data ?? courseRes;
-      const lessonData = lessonRes?.data ?? lessonRes ?? [];
+      const courseData = normalizeCourseResponse(courseRes);
+      const lessonData = normalizeLessonResponse(lessonRes);
+
+      const safeLessons = Array.isArray(lessonData)
+        ? [...lessonData].sort(
+            (a, b) =>
+              Number(a?.order || 0) - Number(b?.order || 0) ||
+              new Date(a?.createdAt || 0).getTime() -
+                new Date(b?.createdAt || 0).getTime()
+          )
+        : [];
 
       setCourse(courseData || null);
-      setLessons(Array.isArray(lessonData) ? lessonData : []);
+      setLessons(safeLessons);
     } catch (error) {
       setToast({
-        message: error.message || "Failed to load lessons",
+        message: error?.message || "Failed to load lessons",
         kind: "error",
       });
       setCourse(null);
@@ -75,6 +105,7 @@ export default function InstructorLessonManagePage() {
   useEffect(() => {
     if (!editingLessonId) {
       setForm((prev) => ({
+        ...prev,
         ...emptyForm,
         order: lessons.length + 1,
       }));
@@ -91,6 +122,7 @@ export default function InstructorLessonManagePage() {
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
+
     setForm((prev) => ({
       ...prev,
       [name]:
@@ -109,8 +141,8 @@ export default function InstructorLessonManagePage() {
       description: lesson.description || "",
       videoUrl: lesson.videoUrl || "",
       materialUrl: lesson.materialUrl || "",
-      duration: lesson.duration || 0,
-      order: lesson.order || 1,
+      duration: Number(lesson.duration || 0),
+      order: Number(lesson.order || 1),
       isPreview: !!lesson.isPreview,
       isPublished: !!lesson.isPublished,
     });
@@ -158,7 +190,7 @@ export default function InstructorLessonManagePage() {
       await loadData();
     } catch (error) {
       setToast({
-        message: error.message || "Failed to save lesson",
+        message: error?.message || "Failed to save lesson",
         kind: "error",
       });
     } finally {
@@ -175,22 +207,30 @@ export default function InstructorLessonManagePage() {
     try {
       setDeletingId(lessonId);
       await deleteLesson(lessonId);
-      setToast({ message: "Lesson deleted successfully", kind: "success" });
 
       if (editingLessonId === lessonId) {
         resetForm();
       }
 
+      setToast({ message: "Lesson deleted successfully", kind: "success" });
       await loadData();
     } catch (error) {
       setToast({
-        message: error.message || "Failed to delete lesson",
+        message: error?.message || "Failed to delete lesson",
         kind: "error",
       });
     } finally {
       setDeletingId("");
     }
   }
+
+  const totalLessons = lessons.length;
+  const publishedLessons = lessons.filter((item) => item.isPublished).length;
+  const previewLessons = lessons.filter((item) => item.isPreview).length;
+  const totalDuration = lessons.reduce(
+    (sum, item) => sum + Number(item.duration || 0),
+    0
+  );
 
   if (loading) {
     return (
@@ -206,64 +246,87 @@ export default function InstructorLessonManagePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-10">
-      <Toast
-        kind={toast.kind}
-        message={toast.message}
-        onClose={() => setToast({ message: "", kind: "success" })}
-      />
+      {toast.message ? (
+        <Toast
+          kind={toast.kind}
+          message={toast.message}
+          onClose={() => setToast({ message: "", kind: "success" })}
+        />
+      ) : null}
 
       <div className="mx-auto max-w-7xl space-y-8">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-violet-600">
-            Instructor Dashboard
-          </p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">
-            Manage Lessons
-          </h1>
-          <p className="mt-3 text-slate-500">
-            Course: <span className="font-semibold text-slate-700">{course?.title || "Unknown course"}</span>
-          </p>
+        <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-violet-600">
+                Instructor Dashboard
+              </p>
+              <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">
+                Manage Lessons
+              </h1>
+              <p className="mt-3 text-slate-500">
+                Course:{" "}
+                <span className="font-semibold text-slate-700">
+                  {course?.title || "Unknown course"}
+                </span>
+              </p>
+            </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              to="/instructor-courses"
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Back to Courses
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to="/instructor/courses"
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Back to Courses
+              </Link>
 
-            <Link
-              to={`/instructor/courses/${courseId}/edit`}
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Edit Course
-            </Link>
+              <Link
+                to={`/instructor/courses/${courseId}/edit`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Edit Course
+              </Link>
 
-            <Link
-              to={`/instructor/courses/${courseId}/quizzes`}
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Manage Quizzes
-            </Link>
+              <Link
+                to={`/instructor/courses/${courseId}/materials`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Manage Materials
+              </Link>
 
-            <Link
-              to={`/instructor/courses/${courseId}/assignments`}
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Manage Assignments
-            </Link>
+              <Link
+                to={`/instructor/courses/${courseId}/quizzes`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Manage Quizzes
+              </Link>
 
-            <Link
-              to={`/instructor/courses/${courseId}/students`}
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Manage Students
-            </Link>
+              <Link
+                to={`/instructor/courses/${courseId}/assignments`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Manage Assignments
+              </Link>
+
+              <Link
+                to={`/instructor/courses/${courseId}/students`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Manage Students
+              </Link>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="grid gap-8 lg:grid-cols-[420px_minmax(0,1fr)]">
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Total lessons" value={totalLessons} />
+          <StatCard label="Published" value={publishedLessons} />
+          <StatCard label="Preview lessons" value={previewLessons} />
+          <StatCard label="Total duration" value={`${totalDuration} min`} />
+        </section>
+
+        <div className="grid gap-8 lg:grid-cols-[440px_minmax(0,1fr)]">
+          <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-3">
               <h2 className="text-2xl font-bold text-slate-950">
                 {editingLessonId ? "Edit Lesson" : "Add Lesson"}
@@ -273,7 +336,7 @@ export default function InstructorLessonManagePage() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel Edit
                 </button>
@@ -289,7 +352,7 @@ export default function InstructorLessonManagePage() {
                   name="title"
                   value={form.title}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   placeholder="Enter lesson title"
                 />
               </div>
@@ -303,7 +366,7 @@ export default function InstructorLessonManagePage() {
                   value={form.description}
                   onChange={handleChange}
                   rows={4}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   placeholder="Enter lesson description"
                 />
               </div>
@@ -316,7 +379,7 @@ export default function InstructorLessonManagePage() {
                   name="videoUrl"
                   value={form.videoUrl}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   placeholder="https://youtube.com/watch?v=..."
                 />
               </div>
@@ -329,7 +392,7 @@ export default function InstructorLessonManagePage() {
                   name="materialUrl"
                   value={form.materialUrl}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   placeholder="Optional material link"
                 />
               </div>
@@ -341,10 +404,11 @@ export default function InstructorLessonManagePage() {
                   </label>
                   <input
                     type="number"
+                    min="0"
                     name="duration"
                     value={form.duration}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   />
                 </div>
 
@@ -354,10 +418,11 @@ export default function InstructorLessonManagePage() {
                   </label>
                   <input
                     type="number"
+                    min="1"
                     name="order"
                     value={form.order}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   />
                 </div>
               </div>
@@ -396,9 +461,9 @@ export default function InstructorLessonManagePage() {
                 </Button>
               </div>
             </form>
-          </div>
+          </section>
 
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-2xl font-bold text-slate-950">
@@ -424,10 +489,10 @@ export default function InstructorLessonManagePage() {
                 {lessons.map((lesson, index) => (
                   <div
                     key={lesson._id}
-                    className="rounded-2xl border border-slate-200 p-5"
+                    className="rounded-2xl border border-slate-200 p-5 transition hover:border-violet-200 hover:shadow-sm"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
                             {index + 1}
@@ -479,11 +544,11 @@ export default function InstructorLessonManagePage() {
                         ) : null}
                       </div>
 
-                      <div className="flex shrink-0 gap-2 flex-wrap">
+                      <div className="flex shrink-0 flex-wrap gap-2">
                         <button
                           type="button"
                           onClick={() => handleEdit(lesson)}
-                          className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                          className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
                         >
                           Edit
                         </button>
@@ -492,7 +557,7 @@ export default function InstructorLessonManagePage() {
                           type="button"
                           onClick={() => handleDelete(lesson._id, lesson.title)}
                           disabled={deletingId === lesson._id}
-                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-600 hover:bg-red-100 disabled:opacity-60"
+                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
                         >
                           {deletingId === lesson._id ? "Deleting..." : "Delete"}
                         </button>
@@ -502,7 +567,7 @@ export default function InstructorLessonManagePage() {
                 ))}
               </div>
             )}
-          </div>
+          </section>
         </div>
       </div>
     </div>

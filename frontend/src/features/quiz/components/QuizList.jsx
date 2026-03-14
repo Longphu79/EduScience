@@ -6,6 +6,7 @@ import {
   quizUnwrap,
 } from "../services/quiz.service";
 import { useAuth } from "../../auth/state/useAuth";
+import Toast from "../../../shared/components/Toast";
 
 function groupAttemptsByQuiz(attempts = []) {
   const map = {};
@@ -18,6 +19,12 @@ function groupAttemptsByQuiz(attempts = []) {
     if (!map[quizId]) map[quizId] = [];
     map[quizId].push(attempt);
   }
+
+  Object.keys(map).forEach((quizId) => {
+    map[quizId].sort(
+      (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
+    );
+  });
 
   return map;
 }
@@ -39,15 +46,16 @@ function getAttemptSummary(attempt, quiz) {
 
   let correctAnswers = Number(attempt.correctAnswers || 0);
 
-  if ((!correctAnswers || correctAnswers === 0) && Array.isArray(attempt.questionReviews)) {
+  if (
+    (!correctAnswers || correctAnswers === 0) &&
+    Array.isArray(attempt.questionReviews)
+  ) {
     correctAnswers = attempt.questionReviews.filter((q) => q?.isCorrect).length;
     if (!totalQuestions) {
       totalQuestions = attempt.questionReviews.length;
     }
   }
 
-  // fallback cho dữ liệu cũ bị lệch:
-  // backend hiện lưu score theo %, nên có thể nội suy số câu đúng
   if (
     totalQuestions > 0 &&
     correctAnswers === 0 &&
@@ -80,25 +88,35 @@ export default function QuizList({ courseId }) {
   const [quizzes, setQuizzes] = useState([]);
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState({ message: "", kind: "success" });
 
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
 
-        const [quizRes, attemptRes] = await Promise.all([
-          getQuizByCourse(finalCourseId),
-          studentId
-            ? getAttemptsByStudentCourse(studentId, finalCourseId)
-            : Promise.resolve([]),
-        ]);
-
+        const quizRes = await getQuizByCourse(finalCourseId);
         const quizList = quizUnwrap(quizRes) || [];
-        const attemptList = quizUnwrap(attemptRes) || [];
 
         setQuizzes(Array.isArray(quizList) ? quizList : []);
-        setAttempts(Array.isArray(attemptList) ? attemptList : []);
-      } catch {
+
+        if (studentId && finalCourseId) {
+          try {
+            const attemptRes = await getAttemptsByStudentCourse(finalCourseId);
+            const attemptList = quizUnwrap(attemptRes) || [];
+            setAttempts(Array.isArray(attemptList) ? attemptList : []);
+          } catch (attemptError) {
+            console.error("Load quiz attempts error:", attemptError);
+            setAttempts([]);
+          }
+        } else {
+          setAttempts([]);
+        }
+      } catch (error) {
+        setToast({
+          message: error?.message || "Không tải được danh sách quiz",
+          kind: "error",
+        });
         setQuizzes([]);
         setAttempts([]);
       } finally {
@@ -111,14 +129,35 @@ export default function QuizList({ courseId }) {
 
   const attemptsMap = useMemo(() => groupAttemptsByQuiz(attempts), [attempts]);
 
-  if (loading) return <p>Đang tải quiz...</p>;
+  if (loading) {
+    return <p>Đang tải quiz...</p>;
+  }
 
   if (!quizzes.length) {
-    return <p className="text-slate-600">Chưa có quiz nào.</p>;
+    return (
+      <>
+        {toast.message ? (
+          <Toast
+            message={toast.message}
+            kind={toast.kind}
+            onClose={() => setToast({ message: "", kind: "success" })}
+          />
+        ) : null}
+        <p className="text-slate-600">Chưa có quiz nào.</p>
+      </>
+    );
   }
 
   return (
     <div className="space-y-4">
+      {toast.message ? (
+        <Toast
+          message={toast.message}
+          kind={toast.kind}
+          onClose={() => setToast({ message: "", kind: "success" })}
+        />
+      ) : null}
+
       {quizzes.map((item) => {
         const quizAttempts = attemptsMap[item._id] || [];
         const latestAttempt = quizAttempts[0] || null;

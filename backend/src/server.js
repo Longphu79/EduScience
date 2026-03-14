@@ -2,10 +2,12 @@ import http from "http";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import app from "./app.js";
+import { initChatSocket } from "./modules/chat/chat.socket.js";
 
 dotenv.config();
 
 const server = http.createServer(app);
+initChatSocket(server);
 
 const PORT = process.env.PORT || 4000;
 const MONGO_URI = process.env.MONGO_URI;

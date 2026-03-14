@@ -1,3 +1,8 @@
+function renderStars(rating = 0) {
+  const safeRating = Math.max(1, Math.min(5, Number(rating || 0)));
+  return "★".repeat(safeRating) + "☆".repeat(5 - safeRating);
+}
+
 export default function ReviewList({ reviews = [] }) {
   if (!reviews.length) {
     return (
@@ -27,8 +32,14 @@ export default function ReviewList({ reviews = [] }) {
                 <div className="text-base font-bold text-slate-900">
                   {studentName}
                 </div>
-                <div className="mt-2 text-sm font-semibold text-violet-600">
-                  Rating: {review.rating || 0}/5
+
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="text-sm font-semibold text-violet-600">
+                    Rating: {review.rating || 0}/5
+                  </div>
+                  <div className="text-sm tracking-wide text-amber-500">
+                    {renderStars(review.rating)}
+                  </div>
                 </div>
               </div>
 

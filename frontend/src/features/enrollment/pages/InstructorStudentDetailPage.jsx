@@ -1,375 +1,161 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
-import {
-  getQuizResultsByQuizId,
-  getQuizAttemptsByQuizAndStudent,
-  getInstructorAttemptReviewById,
-  quizUnwrap,
-} from "../../quiz/services/quiz.service";
+import { Link, useParams } from "react-router-dom";
 import Toast from "../../../shared/components/Toast";
 import Button from "../../../shared/components/Button";
-import { useAuth } from "../../auth/state/useAuth";
+import { getStudentProgressDetail } from "../services/enrollment.service";
 
-function ReviewAnswerModal({ open, loading, reviewData, onClose }) {
-  if (!open) return null;
+function StatCard({ label, value, tone = "indigo" }) {
+  const toneMap = {
+    indigo: "from-indigo-500 to-blue-500",
+    emerald: "from-emerald-500 to-green-500",
+    amber: "from-amber-500 to-orange-500",
+    rose: "from-rose-500 to-pink-500",
+  };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(15, 23, 42, 0.55)",
-        zIndex: 1200,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 980,
-          maxHeight: "90vh",
-          overflowY: "auto",
-          background: "#fff",
-          borderRadius: 24,
-          boxShadow: "0 30px 60px rgba(15,23,42,0.25)",
-          border: "1px solid #e2e8f0",
-        }}
-      >
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="text-sm font-medium text-slate-500">{label}</div>
+      <div className="mt-4 flex items-end justify-between gap-4">
+        <div className="text-3xl font-black text-slate-900">{value}</div>
         <div
-          style={{
-            padding: "24px 28px",
-            borderBottom: "1px solid #e2e8f0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
-          <div>
-            <h2 style={{ margin: 0, fontSize: 32, fontWeight: 900 }}>
-              Review Attempt
-            </h2>
-            <p style={{ margin: "8px 0 0", color: "#64748b" }}>
-              {reviewData?.studentName || "Student"} — Score{" "}
-              {reviewData?.score ?? 0}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              border: "none",
-              background: "transparent",
-              fontSize: 28,
-              cursor: "pointer",
-              color: "#475569",
-            }}
-          >
-            ×
-          </button>
-        </div>
-
-        <div style={{ padding: 28 }}>
-          {loading ? (
-            <div>Đang tải review...</div>
-          ) : !reviewData ? (
-            <div>Không có dữ liệu.</div>
-          ) : (
-            <div style={{ display: "grid", gap: 20 }}>
-              {(reviewData.questionReviews || []).map((question, questionIndex) => (
-                <div
-                  key={question.questionId || questionIndex}
-                  style={{
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 20,
-                    padding: 20,
-                    background: "#fff",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "start",
-                      justifyContent: "space-between",
-                      gap: 16,
-                      marginBottom: 14,
-                    }}
-                  >
-                    <div>
-                      <h3
-                        style={{
-                          margin: 0,
-                          fontSize: 22,
-                          fontWeight: 800,
-                          color: "#0f172a",
-                        }}
-                      >
-                        Câu {questionIndex + 1}. {question.questionText}
-                      </h3>
-                    </div>
-
-                    <span
-                      style={{
-                        flexShrink: 0,
-                        padding: "8px 12px",
-                        borderRadius: 999,
-                        fontWeight: 700,
-                        fontSize: 14,
-                        background: question.isCorrect ? "#dcfce7" : "#fee2e2",
-                        color: question.isCorrect ? "#15803d" : "#dc2626",
-                      }}
-                    >
-                      {question.isCorrect ? "Đúng" : "Sai"}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {(question.options || []).map((option) => {
-                      const isCorrect = (question.correctOptionIndexes || []).includes(
-                        option.index
-                      );
-                      const isSelected = (question.selectedOptionIndexes || []).includes(
-                        option.index
-                      );
-
-                      let background = "#fff";
-                      let border = "1px solid #cbd5e1";
-                      let color = "#0f172a";
-
-                      if (isCorrect) {
-                        background = "#ecfdf5";
-                        border = "1px solid #22c55e";
-                        color = "#166534";
-                      }
-
-                      if (isSelected && !isCorrect) {
-                        background = "#fef2f2";
-                        border = "1px solid #ef4444";
-                        color = "#991b1b";
-                      }
-
-                      return (
-                        <div
-                          key={option.index}
-                          style={{
-                            border,
-                            background,
-                            color,
-                            borderRadius: 14,
-                            padding: "14px 16px",
-                            fontWeight: 600,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                          }}
-                        >
-                          <span>{option.text}</span>
-
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            {isSelected ? (
-                              <span
-                                style={{
-                                  background: "#dbeafe",
-                                  color: "#1d4ed8",
-                                  padding: "4px 10px",
-                                  borderRadius: 999,
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                Student selected
-                              </span>
-                            ) : null}
-
-                            {isCorrect ? (
-                              <span
-                                style={{
-                                  background: "#bbf7d0",
-                                  color: "#166534",
-                                  padding: "4px 10px",
-                                  borderRadius: 999,
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                Correct answer
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div
-                    style={{
-                      marginTop: 16,
-                      background: "#f8fafc",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: 16,
-                      padding: 16,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 800,
-                        color: "#334155",
-                        marginBottom: 8,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.5,
-                      }}
-                    >
-                      Explanation
-                    </div>
-                    <div style={{ color: "#334155", lineHeight: 1.7 }}>
-                      {question.explanation || "Chưa có lời giải cho câu hỏi này."}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div
-          style={{
-            padding: 24,
-            borderTop: "1px solid #e2e8f0",
-            display: "flex",
-            justifyContent: "flex-end",
-          }}
-        >
-          <Button type="button" onClick={onClose}>
-            Đóng
-          </Button>
-        </div>
+          className={`h-10 w-10 rounded-2xl bg-gradient-to-br ${toneMap[tone]} opacity-90`}
+        />
       </div>
     </div>
   );
 }
 
-export default function InstructorQuizResultsPage() {
-  const { quizId } = useParams();
-  const { user } = useAuth();
+function SectionCard({ title, description, children }) {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5">
+        <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+        {description ? (
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
 
-  const [results, setResults] = useState(null);
-  const [expandedStudentId, setExpandedStudentId] = useState("");
-  const [studentAttempts, setStudentAttempts] = useState([]);
-  const [attemptsLoading, setAttemptsLoading] = useState(false);
+export default function InstructorStudentDetailPage() {
+  const { courseId, studentId } = useParams();
 
-  const [reviewLoading, setReviewLoading] = useState(false);
-  const [reviewData, setReviewData] = useState(null);
-  const [showReview, setShowReview] = useState(false);
-
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState({ message: "", kind: "success" });
+  const [toast, setToast] = useState({
+    message: "",
+    kind: "success",
+  });
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("latest");
-
-  const instructorId = user?._id || user?.id || user?.userId || null;
-
-  async function loadResults() {
+  async function loadData() {
     try {
       setLoading(true);
-      const res = await getQuizResultsByQuizId(quizId, instructorId);
-      setResults(quizUnwrap(res));
+      const res = await getStudentProgressDetail(courseId, studentId);
+      const payload = res?.data ?? res ?? null;
+      setData(payload);
     } catch (error) {
-      setToast({ message: error.message, kind: "error" });
+      setToast({
+        message:
+          error?.response?.data?.message ||
+          error?.message ||
+          "Không tải được chi tiết học viên",
+        kind: "error",
+      });
+      setData(null);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (quizId && instructorId) {
-      loadResults();
+    if (courseId && studentId) {
+      loadData();
     }
-  }, [quizId, instructorId]);
+  }, [courseId, studentId]);
 
-  async function toggleStudentAttempts(studentId) {
-    if (expandedStudentId === String(studentId)) {
-      setExpandedStudentId("");
-      setStudentAttempts([]);
-      return;
-    }
+  const enrollment = data?.enrollment || {};
+  const student = enrollment?.studentId || {};
+  const course = enrollment?.courseId || {};
 
-    try {
-      setAttemptsLoading(true);
-      setExpandedStudentId(String(studentId));
+  const quizAttempts = Array.isArray(data?.quizAttempts) ? data.quizAttempts : [];
+  const assignmentSubmissions = Array.isArray(data?.assignmentSubmissions)
+    ? data.assignmentSubmissions
+    : [];
 
-      const res = await getQuizAttemptsByQuizAndStudent(
-        quizId,
-        studentId,
-        instructorId
-      );
+  const lessons = useMemo(() => {
+    return Array.isArray(course?.lessonIds) ? course.lessonIds : [];
+  }, [course]);
 
-      const data = quizUnwrap(res);
-      setStudentAttempts(Array.isArray(data) ? data : []);
-    } catch (error) {
-      setToast({ message: error.message, kind: "error" });
-    } finally {
-      setAttemptsLoading(false);
-    }
-  }
+  const completedLessonIds = useMemo(() => {
+    const ids = Array.isArray(enrollment?.completedLessons)
+      ? enrollment.completedLessons
+      : [];
+    return ids.map((item) => String(item?._id || item));
+  }, [enrollment]);
 
-  async function handleOpenReview(attemptId) {
-    try {
-      setReviewLoading(true);
-      const res = await getInstructorAttemptReviewById(attemptId, instructorId);
-      setReviewData(quizUnwrap(res));
-      setShowReview(true);
-    } catch (error) {
-      setToast({ message: error.message, kind: "error" });
-    } finally {
-      setReviewLoading(false);
-    }
-  }
+  const progress = Number(enrollment?.progress || 0);
+  const completedLessonsCount = completedLessonIds.length;
+  const totalLessons = lessons.length;
 
-  const quiz = results?.quiz || {};
-  const summary = results?.summary || {};
-  const students = results?.students || [];
+  const passedQuizCount = useMemo(() => {
+    return quizAttempts.filter((item) => item?.passed).length;
+  }, [quizAttempts]);
 
-  const filteredStudents = useMemo(() => {
-    let list = [...students];
+  const gradedAssignmentsCount = useMemo(() => {
+    return assignmentSubmissions.filter(
+      (item) => item?.grade !== null && item?.grade !== undefined
+    ).length;
+  }, [assignmentSubmissions]);
 
-    const keyword = search.trim().toLowerCase();
-    if (keyword) {
-      list = list.filter((student) => {
-        const name = student.studentName?.toLowerCase() || "";
-        const email = student.studentEmail?.toLowerCase() || "";
-        return name.includes(keyword) || email.includes(keyword);
-      });
-    }
-
-    if (statusFilter === "passed") {
-      list = list.filter((student) => student.latestPassed);
-    } else if (statusFilter === "not-passed") {
-      list = list.filter((student) => !student.latestPassed);
-    }
-
-    list.sort((a, b) => {
-      if (sortBy === "best") return (b.bestScore || 0) - (a.bestScore || 0);
-      if (sortBy === "attempts") return (b.attemptCount || 0) - (a.attemptCount || 0);
-      return (b.latestScore || 0) - (a.latestScore || 0);
-    });
-
-    return list;
-  }, [students, search, statusFilter, sortBy]);
+  const averageQuizScore = useMemo(() => {
+    if (!quizAttempts.length) return 0;
+    const total = quizAttempts.reduce(
+      (sum, item) => sum + Number(item?.score || 0),
+      0
+    );
+    return Math.round(total / quizAttempts.length);
+  }, [quizAttempts]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="rounded-2xl border bg-white p-8 text-center text-gray-500">
-            Đang tải kết quả quiz...
+      <div className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
+            Đang tải chi tiết học viên...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data?.enrollment) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        {toast.message ? (
+          <div className="mx-auto max-w-7xl px-4 pt-4">
+            <Toast
+              message={toast.message}
+              kind={toast.kind}
+              onClose={() => setToast({ message: "", kind: "success" })}
+            />
+          </div>
+        ) : null}
+
+        <div className="mx-auto max-w-7xl px-4 py-8">
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+            <h1 className="text-2xl font-bold text-slate-900">
+              Không tìm thấy dữ liệu học viên
+            </h1>
+            <p className="mt-2 text-slate-500">
+              Có thể học viên chưa đăng ký khóa học này hoặc dữ liệu chưa sẵn sàng.
+            </p>
+            <div className="mt-6">
+              <Link to={`/instructor/courses/${courseId}/students`}>
+                <Button type="button">Quay lại danh sách học viên</Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -377,9 +163,9 @@ export default function InstructorQuizResultsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {toast.message ? (
-        <div className="max-w-6xl mx-auto px-4 pt-4">
+        <div className="mx-auto max-w-7xl px-4 pt-4">
           <Toast
             message={toast.message}
             kind={toast.kind}
@@ -388,199 +174,322 @@ export default function InstructorQuizResultsPage() {
         </div>
       ) : null}
 
-      <ReviewAnswerModal
-        open={showReview}
-        loading={reviewLoading}
-        reviewData={reviewData}
-        onClose={() => {
-          setShowReview(false);
-          setReviewData(null);
-        }}
-      />
-
-      <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{quiz.title}</h1>
-          <p className="text-sm text-gray-500 mt-1">Quiz results dashboard</p>
-        </div>
-
-        <div className="grid md:grid-cols-4 gap-4">
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <div className="text-sm text-gray-500">Total attempts</div>
-            <div className="mt-2 text-3xl font-black text-gray-900">
-              {summary.totalAttempts ?? 0}
-            </div>
+      <div className="mx-auto max-w-7xl px-4 py-8 space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-500">
+              Student analytics
+            </p>
+            <h1 className="mt-2 text-3xl font-black text-slate-900">
+              Chi tiết học viên
+            </h1>
+            <p className="mt-2 text-slate-500">
+              Theo dõi tiến độ học tập, quiz và assignment của học viên trong khóa
+              học.
+            </p>
           </div>
 
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <div className="text-sm text-gray-500">Students</div>
-            <div className="mt-2 text-3xl font-black text-gray-900">
-              {summary.totalStudents ?? 0}
-            </div>
-          </div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={loadData}
+              className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-medium text-slate-700 transition hover:bg-slate-50"
+            >
+              Refresh
+            </button>
 
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <div className="text-sm text-gray-500">Average score</div>
-            <div className="mt-2 text-3xl font-black text-gray-900">
-              {summary.averageScore ?? 0}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <div className="text-sm text-gray-500">Pass rate</div>
-            <div className="mt-2 text-3xl font-black text-gray-900">
-              {summary.passRate ?? 0}%
-            </div>
+            <Link to={`/instructor/courses/${courseId}/students`}>
+              <Button type="button">Back to students</Button>
+            </Link>
           </div>
         </div>
 
-        <div className="rounded-2xl border bg-white p-4 shadow-sm grid md:grid-cols-3 gap-4">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên hoặc email..."
-            className="rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-          />
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="bg-gradient-to-r from-slate-900 via-indigo-900 to-blue-900 p-6 text-white">
+            <div className="grid gap-6 lg:grid-cols-[1.3fr_0.9fr]">
+              <div className="min-w-0">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-2xl font-black uppercase">
+                    {(student?.username || student?.email || "S").slice(0, 1)}
+                  </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-          >
-            <option value="all">All results</option>
-            <option value="passed">Passed</option>
-            <option value="not-passed">Not passed</option>
-          </select>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-2xl font-black">
+                      {student?.username || student?.email || "Student"}
+                    </h2>
+                    <p className="mt-1 text-sm text-white/80">
+                      {student?.email || "No email available"}
+                    </p>
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-          >
-            <option value="latest">Sort by latest score</option>
-            <option value="best">Sort by best score</option>
-            <option value="attempts">Sort by attempts</option>
-          </select>
-        </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
+                        Role: {student?.role || "student"}
+                      </span>
+                      <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
+                        Course: {course?.title || "N/A"}
+                      </span>
+                      <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
+                        Progress: {progress}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-        <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-700">
-                <tr>
-                  <th className="px-5 py-4 font-semibold">Student</th>
-                  <th className="px-5 py-4 font-semibold">Email</th>
-                  <th className="px-5 py-4 font-semibold">Attempts</th>
-                  <th className="px-5 py-4 font-semibold">Latest score</th>
-                  <th className="px-5 py-4 font-semibold">Best score</th>
-                  <th className="px-5 py-4 font-semibold">Latest result</th>
-                  <th className="px-5 py-4 font-semibold">Last submitted</th>
-                  <th className="px-5 py-4 font-semibold text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.length === 0 ? (
-                  <tr>
-                    <td colSpan="8" className="px-5 py-8 text-center text-gray-500">
-                      Chưa có dữ liệu phù hợp.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredStudents.map((student) => (
-                    <tr key={student.studentId} className="border-t">
-                      <td className="px-5 py-4 font-medium text-gray-900">
-                        {student.studentName}
-                      </td>
-                      <td className="px-5 py-4 text-gray-600">
-                        {student.studentEmail || "N/A"}
-                      </td>
-                      <td className="px-5 py-4">{student.attemptCount}</td>
-                      <td className="px-5 py-4">{student.latestScore}</td>
-                      <td className="px-5 py-4">{student.bestScore}</td>
-                      <td className="px-5 py-4">
-                        <span
-                          className={
-                            student.latestPassed
-                              ? "text-emerald-600 font-semibold"
-                              : "text-red-500 font-semibold"
-                          }
-                        >
-                          {student.latestPassed ? "Passed" : "Not passed"}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        {student.lastSubmittedAt
-                          ? new Date(student.lastSubmittedAt).toLocaleString("vi-VN")
-                          : "N/A"}
-                      </td>
-                      <td className="px-5 py-4 text-center">
-                        <Button
-                          type="button"
-                          onClick={() => toggleStudentAttempts(student.studentId)}
-                        >
-                          {expandedStudentId === String(student.studentId)
-                            ? "Hide Attempts"
-                            : "View Attempts"}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+              <div className="rounded-3xl bg-white/10 p-5 backdrop-blur-sm">
+                <div className="text-sm text-white/80">Overall progress</div>
+                <div className="mt-3 text-5xl font-black">{progress}%</div>
 
-        {expandedStudentId ? (
-          <div className="rounded-2xl border bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Attempts of selected student
-            </h2>
-
-            {attemptsLoading ? (
-              <div className="text-gray-500">Đang tải attempts...</div>
-            ) : studentAttempts.length === 0 ? (
-              <div className="text-gray-500">Không có attempt nào.</div>
-            ) : (
-              <div className="grid gap-4">
-                {studentAttempts.map((attempt) => (
+                <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/20">
                   <div
-                    key={attempt._id}
-                    className="rounded-xl border p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                    className="h-full rounded-full bg-white"
+                    style={{ width: `${Math.min(100, progress)}%` }}
+                  />
+                </div>
+
+                <div className="mt-4 text-sm">
+                  Status:{" "}
+                  <span className="font-bold">
+                    {enrollment?.completed ? "Completed" : "In progress"}
+                  </span>
+                </div>
+
+                <div className="mt-2 text-sm text-white/80">
+                  Last lesson:{" "}
+                  <span className="font-semibold text-white">
+                    {enrollment?.lastLessonId?.title ||
+                      enrollment?.lastLessonId ||
+                      "N/A"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Completed lessons"
+            value={completedLessonsCount}
+            tone="emerald"
+          />
+          <StatCard label="Total lessons" value={totalLessons} tone="indigo" />
+          <StatCard
+            label="Quiz attempts"
+            value={quizAttempts.length}
+            tone="amber"
+          />
+          <StatCard
+            label="Assignment submissions"
+            value={assignmentSubmissions.length}
+            tone="rose"
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-slate-500">Average quiz score</div>
+            <div className="mt-2 text-3xl font-black text-slate-900">
+              {averageQuizScore}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-slate-500">Passed quizzes</div>
+            <div className="mt-2 text-3xl font-black text-emerald-600">
+              {passedQuizCount}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-sm text-slate-500">Graded assignments</div>
+            <div className="mt-2 text-3xl font-black text-indigo-600">
+              {gradedAssignmentsCount}
+            </div>
+          </div>
+        </div>
+
+        <SectionCard
+          title="Lesson progress"
+          description="Danh sách toàn bộ bài học và trạng thái hoàn thành của học viên."
+        >
+          {!lessons.length ? (
+            <div className="rounded-2xl bg-slate-50 p-6 text-slate-500">
+              Khóa học chưa có bài học.
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {lessons.map((lesson, index) => {
+                const isDone = completedLessonIds.includes(String(lesson?._id));
+                const isCurrent =
+                  String(lesson?._id) ===
+                  String(enrollment?.lastLessonId?._id || enrollment?.lastLessonId);
+
+                return (
+                  <div
+                    key={lesson?._id || index}
+                    className={`rounded-2xl border p-4 transition ${
+                      isCurrent
+                        ? "border-indigo-300 bg-indigo-50"
+                        : "border-slate-200 bg-white"
+                    }`}
                   >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+                            Lesson {index + 1}
+                          </span>
+
+                          {isCurrent ? (
+                            <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-bold text-indigo-700">
+                              Current
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div className="mt-3 font-bold text-slate-900">
+                          {lesson?.title || "Lesson"}
+                        </div>
+
+                        <div className="mt-1 text-sm text-slate-500">
+                          {lesson?.description || "No description"}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
+                          isDone
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {isDone ? "Completed" : "Not completed"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Quiz attempts"
+          description="Lịch sử làm quiz, điểm số và trạng thái đạt/chưa đạt."
+        >
+          {!quizAttempts.length ? (
+            <div className="rounded-2xl bg-slate-50 p-6 text-slate-500">
+              Chưa có lượt làm quiz.
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {quizAttempts.map((attempt) => (
+                <div
+                  key={attempt?._id}
+                  className="rounded-2xl border border-slate-200 p-4"
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="space-y-1">
-                      <div className="font-semibold text-gray-900">
-                        Score: {attempt.score}
+                      <div className="text-lg font-bold text-slate-900">
+                        {attempt?.quizId?.title || "Quiz"}
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Correct: {attempt.correctAnswers}/{attempt.totalQuestions}
+
+                      <div className="text-sm text-slate-600">
+                        Score:{" "}
+                        <span className="font-semibold text-slate-900">
+                          {attempt?.score || 0}
+                        </span>{" "}
+                        | Correct:{" "}
+                        <span className="font-semibold text-slate-900">
+                          {attempt?.correctAnswers || 0}/
+                          {attempt?.totalQuestions || 0}
+                        </span>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Result: {attempt.passed ? "Passed" : "Not passed"}
-                      </div>
-                      <div className="text-sm text-gray-600">
+
+                      <div className="text-sm text-slate-500">
                         Submitted:{" "}
-                        {attempt.submittedAt
+                        {attempt?.submittedAt
                           ? new Date(attempt.submittedAt).toLocaleString("vi-VN")
                           : "N/A"}
                       </div>
                     </div>
 
-                    <div>
-                      <Button
-                        type="button"
-                        onClick={() => handleOpenReview(attempt._id)}
-                      >
-                        Review Attempt
-                      </Button>
-                    </div>
+                    <span
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${
+                        attempt?.passed
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-rose-100 text-rose-700"
+                      }`}
+                    >
+                      {attempt?.passed ? "Passed" : "Not passed"}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Assignment submissions"
+          description="Theo dõi bài nộp, điểm số và phản hồi của giảng viên."
+        >
+          {!assignmentSubmissions.length ? (
+            <div className="rounded-2xl bg-slate-50 p-6 text-slate-500">
+              Chưa có bài nộp assignment.
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {assignmentSubmissions.map((submission) => (
+                <div
+                  key={submission?._id}
+                  className="rounded-2xl border border-slate-200 p-4"
+                >
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-2">
+                      <div className="text-lg font-bold text-slate-900">
+                        {submission?.assignmentId?.title || "Assignment"}
+                      </div>
+
+                      <div className="text-sm text-slate-600">
+                        Status:{" "}
+                        <span className="font-semibold text-slate-900">
+                          {submission?.status || "submitted"}
+                        </span>
+                      </div>
+
+                      <div className="text-sm text-slate-600">
+                        Grade:{" "}
+                        <span className="font-semibold text-slate-900">
+                          {submission?.grade ?? "Not graded"}
+                        </span>
+                      </div>
+
+                      <div className="text-sm text-slate-500">
+                        Submitted:{" "}
+                        {submission?.submittedAt
+                          ? new Date(submission.submittedAt).toLocaleString("vi-VN")
+                          : "N/A"}
+                      </div>
+
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
+                        <span className="font-semibold text-slate-800">
+                          Feedback:
+                        </span>{" "}
+                        {submission?.feedback || "Chưa có feedback"}
+                      </div>
+                    </div>
+
+                    <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-sm font-semibold text-indigo-700">
+                      {submission?.status || "submitted"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
       </div>
     </div>
   );

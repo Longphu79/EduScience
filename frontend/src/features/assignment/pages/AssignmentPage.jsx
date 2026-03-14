@@ -121,7 +121,6 @@ export default function AssignmentPage() {
     }
 
     const payload = {
-      studentId,
       submissionText: submissionText.trim(),
       fileUrls: fileUrlInput
         ? fileUrlInput
@@ -194,10 +193,12 @@ export default function AssignmentPage() {
                 const statusBadge = submission ? getStatusBadge(submission.status) : null;
 
                 return (
-                  <div
+                  <button
                     key={item._id}
-                    className={`w-full rounded-lg border px-3 py-3 text-left ${
-                      isActive ? "border-gray-400 bg-gray-100" : "bg-white"
+                    type="button"
+                    onClick={() => setSelectedAssignment(item)}
+                    className={`w-full rounded-lg border px-3 py-3 text-left transition ${
+                      isActive ? "border-gray-400 bg-gray-100" : "bg-white hover:bg-slate-50"
                     }`}
                   >
                     <div className="font-medium">{item.title}</div>
@@ -219,7 +220,7 @@ export default function AssignmentPage() {
                     <div className="mt-2 text-xs text-gray-500">
                       Score: {submission?.grade ?? "Not graded"}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

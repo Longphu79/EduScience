@@ -23,6 +23,33 @@ const emptyForm = {
   isPublished: true,
 };
 
+function StatCard({ label, value, hint }) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <h3 className="mt-2 text-3xl font-black text-slate-900">{value}</h3>
+      {hint ? <p className="mt-2 text-xs text-slate-400">{hint}</p> : null}
+    </div>
+  );
+}
+
+function normalizeCourseResponse(res) {
+  return res?.data?.data || res?.data || res || null;
+}
+
+function normalizeListResponse(res) {
+  return res?.data?.data || res?.data || res || [];
+}
+
+function formatBytes(value) {
+  const size = Number(value || 0);
+  if (!size) return "0 B";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 export default function InstructorMaterialManagePage() {
   const { courseId } = useParams();
   const { user } = useAuth();
@@ -52,16 +79,33 @@ export default function InstructorMaterialManagePage() {
         getMaterialsByCourse(courseId),
       ]);
 
-      const courseData = courseRes?.data ?? courseRes ?? null;
-      const lessonData = lessonRes?.data ?? lessonRes ?? [];
-      const materialData = materialRes?.data ?? materialRes ?? [];
+      const courseData = normalizeCourseResponse(courseRes);
+      const lessonData = normalizeListResponse(lessonRes);
+      const materialData = normalizeListResponse(materialRes);
 
-      setCourse(courseData);
-      setLessons(Array.isArray(lessonData) ? lessonData : []);
-      setMaterials(Array.isArray(materialData) ? materialData : []);
+      const safeLessons = Array.isArray(lessonData)
+        ? [...lessonData].sort(
+            (a, b) =>
+              Number(a?.order || 0) - Number(b?.order || 0) ||
+              new Date(a?.createdAt || 0).getTime() -
+                new Date(b?.createdAt || 0).getTime()
+          )
+        : [];
+
+      const safeMaterials = Array.isArray(materialData)
+        ? [...materialData].sort(
+            (a, b) =>
+              new Date(b?.createdAt || 0).getTime() -
+              new Date(a?.createdAt || 0).getTime()
+          )
+        : [];
+
+      setCourse(courseData || null);
+      setLessons(safeLessons);
+      setMaterials(safeMaterials);
     } catch (error) {
       setToast({
-        message: error.message || "Failed to load materials",
+        message: error?.message || "Failed to load materials",
         kind: "error",
       });
       setCourse(null);
@@ -104,7 +148,7 @@ export default function InstructorMaterialManagePage() {
       fileUrl: material.fileUrl || "",
       fileName: material.fileName || "",
       fileType: material.fileType || "",
-      fileSize: material.fileSize || 0,
+      fileSize: Number(material.fileSize || 0),
       lessonId: material.lessonId?._id || material.lessonId || "",
       isPublished: !!material.isPublished,
     });
@@ -163,7 +207,7 @@ export default function InstructorMaterialManagePage() {
       await loadData();
     } catch (error) {
       setToast({
-        message: error.message || "Failed to save material",
+        message: error?.message || "Failed to save material",
         kind: "error",
       });
     } finally {
@@ -180,16 +224,16 @@ export default function InstructorMaterialManagePage() {
     try {
       setDeletingId(materialId);
       await deleteMaterial(materialId);
-      setToast({ message: "Material deleted successfully", kind: "success" });
 
       if (editingMaterialId === materialId) {
         resetForm();
       }
 
+      setToast({ message: "Material deleted successfully", kind: "success" });
       await loadData();
     } catch (error) {
       setToast({
-        message: error.message || "Failed to delete material",
+        message: error?.message || "Failed to delete material",
         kind: "error",
       });
     } finally {
@@ -199,11 +243,21 @@ export default function InstructorMaterialManagePage() {
 
   function getLessonTitle(lessonId) {
     if (!lessonId) return "Course-level material";
+
     const lesson = lessons.find(
       (item) => String(item._id) === String(lessonId?._id || lessonId)
     );
+
     return lesson?.title || "Unknown lesson";
   }
+
+  const publishedCount = materials.filter((item) => item.isPublished).length;
+  const lessonAttachedCount = materials.filter((item) => item.lessonId).length;
+  const courseLevelCount = materials.filter((item) => !item.lessonId).length;
+  const totalFileSize = materials.reduce(
+    (sum, item) => sum + Number(item.fileSize || 0),
+    0
+  );
 
   if (loading) {
     return (
@@ -219,67 +273,87 @@ export default function InstructorMaterialManagePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-10">
-      <Toast
-        kind={toast.kind}
-        message={toast.message}
-        onClose={() => setToast({ message: "", kind: "success" })}
-      />
+      {toast.message ? (
+        <Toast
+          kind={toast.kind}
+          message={toast.message}
+          onClose={() => setToast({ message: "", kind: "success" })}
+        />
+      ) : null}
 
       <div className="mx-auto max-w-7xl space-y-8">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-violet-600">
-            Instructor Dashboard
-          </p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">
-            Manage Materials
-          </h1>
-          <p className="mt-3 text-slate-500">
-            Course:{" "}
-            <span className="font-semibold text-slate-700">
-              {course?.title || "Unknown course"}
-            </span>
-          </p>
+        <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-violet-600">
+                Instructor Dashboard
+              </p>
+              <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">
+                Manage Materials
+              </h1>
+              <p className="mt-3 text-slate-500">
+                Course:{" "}
+                <span className="font-semibold text-slate-700">
+                  {course?.title || "Unknown course"}
+                </span>
+              </p>
+            </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              to="/instructor-courses"
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Back to Courses
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to="/instructor/courses"
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Back to Courses
+              </Link>
 
-            <Link
-              to={`/instructor/courses/${courseId}/edit`}
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Edit Course
-            </Link>
+              <Link
+                to={`/instructor/courses/${courseId}/edit`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Edit Course
+              </Link>
 
-            <Link
-              to={`/instructor/courses/${courseId}/lessons`}
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Manage Lessons
-            </Link>
+              <Link
+                to={`/instructor/courses/${courseId}/lessons`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Manage Lessons
+              </Link>
 
-            <Link
-              to={`/instructor/courses/${courseId}/quizzes`}
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Manage Quizzes
-            </Link>
+              <Link
+                to={`/instructor/courses/${courseId}/quizzes`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Manage Quizzes
+              </Link>
 
-            <Link
-              to={`/instructor/courses/${courseId}/assignments`}
-              className="rounded-2xl border border-slate-200 px-4 py-2 font-semibold text-slate-700"
-            >
-              Manage Assignments
-            </Link>
+              <Link
+                to={`/instructor/courses/${courseId}/assignments`}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Manage Assignments
+              </Link>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="grid gap-8 lg:grid-cols-[420px_minmax(0,1fr)]">
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Total materials" value={materials.length} />
+          <StatCard label="Published" value={publishedCount} />
+          <StatCard
+            label="Attached to lesson"
+            value={lessonAttachedCount}
+            hint={`${courseLevelCount} course-level materials`}
+          />
+          <StatCard
+            label="Total file size"
+            value={formatBytes(totalFileSize)}
+          />
+        </section>
+
+        <div className="grid gap-8 lg:grid-cols-[440px_minmax(0,1fr)]">
+          <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-3">
               <h2 className="text-2xl font-bold text-slate-950">
                 {editingMaterialId ? "Edit Material" : "Add Material"}
@@ -289,7 +363,7 @@ export default function InstructorMaterialManagePage() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel Edit
                 </button>
@@ -305,7 +379,7 @@ export default function InstructorMaterialManagePage() {
                   name="title"
                   value={form.title}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   placeholder="Enter material title"
                 />
               </div>
@@ -319,7 +393,7 @@ export default function InstructorMaterialManagePage() {
                   value={form.description}
                   onChange={handleChange}
                   rows={3}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   placeholder="Enter material description"
                 />
               </div>
@@ -332,7 +406,7 @@ export default function InstructorMaterialManagePage() {
                   name="fileUrl"
                   value={form.fileUrl}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   placeholder="https://example.com/files/document.pdf"
                 />
               </div>
@@ -345,7 +419,7 @@ export default function InstructorMaterialManagePage() {
                   name="fileName"
                   value={form.fileName}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   placeholder="document.pdf"
                 />
               </div>
@@ -359,7 +433,7 @@ export default function InstructorMaterialManagePage() {
                     name="fileType"
                     value={form.fileType}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                     placeholder="pdf / docx / zip"
                   />
                 </div>
@@ -370,10 +444,11 @@ export default function InstructorMaterialManagePage() {
                   </label>
                   <input
                     type="number"
+                    min="0"
                     name="fileSize"
                     value={form.fileSize}
                     onChange={handleChange}
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                   />
                 </div>
               </div>
@@ -386,7 +461,7 @@ export default function InstructorMaterialManagePage() {
                   name="lessonId"
                   value={form.lessonId}
                   onChange={handleChange}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
                 >
                   <option value="">Course-level material</option>
                   {lessons.map((lesson) => (
@@ -410,14 +485,20 @@ export default function InstructorMaterialManagePage() {
               </div>
 
               <div className="pt-2">
-                <Button type="submit" loading={saving}>
-                  {editingMaterialId ? "Save Material" : "Create Material"}
+                <Button type="submit" disabled={saving}>
+                  {saving
+                    ? editingMaterialId
+                      ? "Saving..."
+                      : "Creating..."
+                    : editingMaterialId
+                    ? "Save Material"
+                    : "Create Material"}
                 </Button>
               </div>
             </form>
-          </div>
+          </section>
 
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-5">
               <h2 className="text-2xl font-bold text-slate-950">
                 Course Materials
@@ -441,10 +522,10 @@ export default function InstructorMaterialManagePage() {
                 {materials.map((material, index) => (
                   <div
                     key={material._id}
-                    className="rounded-2xl border border-slate-200 p-5"
+                    className="rounded-2xl border border-slate-200 p-5 transition hover:border-violet-200 hover:shadow-sm"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
                             {index + 1}
@@ -480,7 +561,7 @@ export default function InstructorMaterialManagePage() {
                             Type: {material.fileType || "Unknown"}
                           </span>
                           <span className="rounded-full bg-slate-100 px-3 py-1">
-                            Size: {material.fileSize || 0} bytes
+                            Size: {formatBytes(material.fileSize || 0)}
                           </span>
                         </div>
 
@@ -496,11 +577,11 @@ export default function InstructorMaterialManagePage() {
                         ) : null}
                       </div>
 
-                      <div className="flex shrink-0 gap-2 flex-wrap">
+                      <div className="flex shrink-0 flex-wrap gap-2">
                         <button
                           type="button"
                           onClick={() => handleEdit(material)}
-                          className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50"
+                          className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-50"
                         >
                           Edit
                         </button>
@@ -511,7 +592,7 @@ export default function InstructorMaterialManagePage() {
                             handleDelete(material._id, material.title)
                           }
                           disabled={deletingId === material._id}
-                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-600 hover:bg-red-100 disabled:opacity-60"
+                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
                         >
                           {deletingId === material._id ? "Deleting..." : "Delete"}
                         </button>
@@ -521,7 +602,7 @@ export default function InstructorMaterialManagePage() {
                 ))}
               </div>
             )}
-          </div>
+          </section>
         </div>
       </div>
     </div>

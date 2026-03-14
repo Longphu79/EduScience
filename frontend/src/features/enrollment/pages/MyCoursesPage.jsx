@@ -115,7 +115,7 @@ export default function MyCoursesPage() {
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           {filteredCourses.map((item) => {
             const course = item.courseId || item.course || item;
-            const progress = item.progress || 0;
+            const progress = Number(item.progress || 0);
 
             return (
               <div
@@ -147,13 +147,22 @@ export default function MyCoursesPage() {
                     />
                   </div>
 
-                  <div className="pt-3">
+                  <div className="pt-3 flex flex-wrap gap-2">
                     <Link
                       to={`/learn/${course?._id}`}
                       className="inline-flex rounded-lg bg-blue-600 px-4 py-2 text-white"
                     >
                       Tiếp tục học
                     </Link>
+
+                    {progress >= 100 ? (
+                      <Link
+                        to={`/learn/${course?._id}/certificate`}
+                        className="inline-flex rounded-lg bg-emerald-600 px-4 py-2 text-white"
+                      >
+                        Certificate
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               </div>

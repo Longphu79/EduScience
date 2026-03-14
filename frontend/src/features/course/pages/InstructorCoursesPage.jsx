@@ -425,13 +425,20 @@ export default function InstructorCoursesPage() {
                       Students
                     </Link>
 
+                    <Link
+                      to={`/instructor/courses/${course._id}/chat`}
+                      className="rounded-xl border border-slate-200 px-4 py-3 text-center font-semibold text-slate-700 transition hover:bg-slate-50"
+                    >
+                      Chat
+                    </Link>
+
                     <button
                       type="button"
                       onClick={() =>
                         handleDeleteCourse(course._id, course.title)
                       }
                       disabled={deletingId === course._id}
-                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
+                      className="col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
                     >
                       {deletingId === course._id ? "Deleting..." : "Delete"}
                     </button>

@@ -8,7 +8,6 @@ import {
 } from "../services/assignment.service";
 import Toast from "../../../shared/components/Toast";
 import Button from "../../../shared/components/Button";
-import { useAuth } from "../../auth/state/useAuth";
 
 function GradeModal({
   open,
@@ -97,7 +96,6 @@ function getStatusBadge(status) {
 
 export default function InstructorAssignmentResultsPage() {
   const { assignmentId } = useParams();
-  const { user } = useAuth();
 
   const [assignment, setAssignment] = useState(null);
   const [submissions, setSubmissions] = useState([]);
@@ -124,7 +122,11 @@ export default function InstructorAssignmentResultsPage() {
       ]);
 
       setAssignment(assignmentUnwrap(assignmentRes));
-      setSubmissions(Array.isArray(assignmentUnwrap(submissionRes)) ? assignmentUnwrap(submissionRes) : []);
+      setSubmissions(
+        Array.isArray(assignmentUnwrap(submissionRes))
+          ? assignmentUnwrap(submissionRes)
+          : []
+      );
     } catch (error) {
       setToast({ message: error.message, kind: "error" });
     } finally {
@@ -154,7 +156,6 @@ export default function InstructorAssignmentResultsPage() {
       await gradeAssignmentSubmission(selectedSubmission._id, {
         grade: Number(gradeScore),
         feedback: gradeFeedback,
-        gradedBy: user?._id || user?.id || user?.userId || null,
       });
 
       setToast({ message: "Chấm bài thành công", kind: "success" });
