@@ -1,7 +1,11 @@
 import Enrollment from "./enrollment.model.js";
 import Course from "../course/course.model.js";
+import Quiz from "../quiz/quiz.model.js";
 import QuizAttempt from "../quiz/quizAttempt.model.js";
+import Assignment from "../assignment/assignment.model.js";
 import AssignmentSubmission from "../assignment/assignmentSubmission.model.js";
+import Certificate from "../certificate/certificate.model.js";
+import ChatConversation from "../chat/chatConversation.model.js";
 
 const lessonPopulateConfig = {
   path: "lessonIds",
@@ -19,9 +23,12 @@ function toStringId(value) {
 
 function calcProgress(totalLessons, completedLessonsCount) {
   if (!totalLessons || totalLessons <= 0) return 0;
+
   return Math.min(
     100,
-    Math.round((Number(completedLessonsCount || 0) / Number(totalLessons)) * 100)
+    Math.round(
+      (Number(completedLessonsCount || 0) / Number(totalLessons)) * 100
+    )
   );
 }
 
@@ -49,6 +56,7 @@ export const createEnrollmentRecord = async ({ studentId, courseId }) => {
     courseId,
     progress: 0,
     completed: false,
+    completedAt: null,
     completedLessons: [],
     lastLessonId: null,
   });
@@ -79,6 +87,10 @@ export const enrollCourse = async ({ studentId, courseId }) => {
     throw new Error("Course is not available for enrollment");
   }
 
+  if (String(course.instructorId) === String(studentId)) {
+    throw new Error("Instructor cannot enroll in own course");
+  }
+
   const isFreeCourse =
     course.isFree === true || Number(course.price || 0) === 0;
 
@@ -89,6 +101,205 @@ export const enrollCourse = async ({ studentId, courseId }) => {
   }
 
   return await createEnrollmentRecord({ studentId, courseId });
+};
+
+export const getStudentDashboardSummary = async (studentId) => {
+  if (!studentId) {
+    throw new Error("studentId is required");
+  }
+
+  const enrollments = await Enrollment.find({ studentId })
+    .populate({
+      path: "courseId",
+      populate: [{ path: "instructorId" }, lessonPopulateConfig],
+    })
+    .sort({ updatedAt: -1 });
+
+  const courseIds = enrollments
+    .map((item) => item?.courseId?._id || item?.courseId)
+    .filter(Boolean);
+
+  const [quizzes, attempts, assignments, submissions, certificates] =
+    await Promise.all([
+      Quiz.find({ courseId: { $in: courseIds }, isPublished: true }).lean(),
+      QuizAttempt.find({ studentId, courseId: { $in: courseIds } }).lean(),
+      Assignment.find({
+        courseId: { $in: courseIds },
+        isPublished: true,
+      }).lean(),
+      AssignmentSubmission.find({
+        studentId,
+        courseId: { $in: courseIds },
+      }).lean(),
+      Certificate.find({ studentId, courseId: { $in: courseIds } }).lean(),
+    ]);
+
+  const totalEnrolledCourses = enrollments.length;
+
+  const totalCompletedCourses = enrollments.filter(
+    (item) => item.completed
+  ).length;
+
+  const totalInProgressCourses = enrollments.filter(
+    (item) => !item.completed && Number(item.progress || 0) > 0
+  ).length;
+
+  const totalLessonCount = enrollments.reduce((sum, item) => {
+    const lessons = Array.isArray(item?.courseId?.lessonIds)
+      ? item.courseId.lessonIds.length
+      : 0;
+
+    return sum + lessons;
+  }, 0);
+
+  const totalCompletedLessons = enrollments.reduce((sum, item) => {
+    const completed = Array.isArray(item?.completedLessons)
+      ? item.completedLessons.length
+      : 0;
+
+    return sum + completed;
+  }, 0);
+
+  const attemptMap = new Map();
+  attempts.forEach((item) => {
+    const key = String(item.quizId);
+    if (!attemptMap.has(key)) {
+      attemptMap.set(key, true);
+    }
+  });
+
+  const submissionMap = new Map();
+  submissions.forEach((item) => {
+    const key = String(item.assignmentId);
+    if (!submissionMap.has(key)) {
+      submissionMap.set(key, true);
+    }
+  });
+
+  const pendingQuizCount = quizzes.filter(
+    (quiz) => !attemptMap.has(String(quiz._id))
+  ).length;
+
+  const pendingAssignmentCount = assignments.filter(
+    (assignment) => !submissionMap.has(String(assignment._id))
+  ).length;
+
+  const continueLearningCourses = enrollments
+    .filter((item) => item?.courseId)
+    .map((item) => ({
+      enrollmentId: item._id,
+      courseId: item.courseId?._id || item.courseId,
+      title: item.courseId?.title || "Course",
+      thumbnail: item.courseId?.thumbnail || "",
+      shortDescription: item.courseId?.shortDescription || "",
+      progress: Number(item.progress || 0),
+      completed: !!item.completed,
+      completedAt: item.completedAt || null,
+      totalLessons: Array.isArray(item.courseId?.lessonIds)
+        ? item.courseId.lessonIds.length
+        : 0,
+      completedLessons: Array.isArray(item.completedLessons)
+        ? item.completedLessons.length
+        : 0,
+      lastLessonId: item.lastLessonId || null,
+      updatedAt: item.updatedAt,
+    }))
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, 6);
+
+  return {
+    totalEnrolledCourses,
+    totalInProgressCourses,
+    totalCompletedCourses,
+    totalLessonCount,
+    totalCompletedLessons,
+    pendingQuizCount,
+    pendingAssignmentCount,
+    certificateCount: certificates.length,
+    continueLearningCourses,
+  };
+};
+
+export const getInstructorDashboardSummary = async (instructorId) => {
+  if (!instructorId) {
+    throw new Error("instructorId is required");
+  }
+
+  const courses = await Course.find({ instructorId })
+    .populate({
+      path: "lessonIds",
+      options: { sort: { order: 1, createdAt: 1 } },
+    })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const courseIds = courses.map((item) => item._id);
+
+  const [
+    enrollments,
+    quizzes,
+    attempts,
+    assignments,
+    submissions,
+    conversations,
+  ] = await Promise.all([
+    Enrollment.find({ courseId: { $in: courseIds } }).lean(),
+    Quiz.find({ courseId: { $in: courseIds } }).lean(),
+    QuizAttempt.find({ courseId: { $in: courseIds } }).lean(),
+    Assignment.find({ courseId: { $in: courseIds } }).lean(),
+    AssignmentSubmission.find({ courseId: { $in: courseIds } }).lean(),
+    ChatConversation.find({ instructorId }).lean(),
+  ]);
+
+  const totalCourses = courses.length;
+
+  const totalStudents = new Set(
+    enrollments.map((item) => String(item.studentId))
+  ).size;
+
+  const enrollmentCountByCourse = new Map();
+
+  enrollments.forEach((item) => {
+    const key = String(item.courseId);
+    enrollmentCountByCourse.set(
+      key,
+      (enrollmentCountByCourse.get(key) || 0) + 1
+    );
+  });
+
+  const pendingQuizReviewCount = quizzes.reduce((sum, quiz) => {
+    const hasAttempt = attempts.some(
+      (attempt) => String(attempt.quizId) === String(quiz._id)
+    );
+    return sum + (hasAttempt ? 1 : 0);
+  }, 0);
+
+  const pendingAssignmentGradingCount = submissions.filter(
+    (item) => item.status !== "graded"
+  ).length;
+
+  const unreadConversationCount = conversations.filter(
+    (item) => Number(item.instructorUnreadCount || 0) > 0
+  ).length;
+
+  return {
+    totalCourses,
+    totalStudents,
+    latestCourses: courses.slice(0, 5).map((course) => ({
+      _id: course._id,
+      title: course.title,
+      thumbnail: course.thumbnail || "",
+      category: course.category || "",
+      createdAt: course.createdAt,
+      totalLessons: Array.isArray(course.lessonIds)
+        ? course.lessonIds.length
+        : 0,
+      totalEnrollments: enrollmentCountByCourse.get(String(course._id)) || 0,
+    })),
+    pendingQuizReviewCount,
+    pendingAssignmentGradingCount,
+    unreadConversationCount,
+  };
 };
 
 export const getMyCourses = async (studentId) => {
@@ -166,7 +377,10 @@ export const completeLesson = async ({ studentId, courseId, lessonId }) => {
     throw new Error("Course not found");
   }
 
-  const publishedLessons = Array.isArray(course.lessonIds) ? course.lessonIds : [];
+  const publishedLessons = Array.isArray(course.lessonIds)
+    ? course.lessonIds
+    : [];
+
   const lessonExists = publishedLessons.some(
     (lesson) => String(lesson._id) === String(lessonId)
   );
@@ -195,7 +409,16 @@ export const completeLesson = async ({ studentId, courseId, lessonId }) => {
   const progress = calcProgress(totalLessons, completedUniqueCount);
 
   enrollment.progress = progress;
-  enrollment.completed = totalLessons > 0 && completedUniqueCount >= totalLessons;
+  enrollment.completed =
+    totalLessons > 0 && completedUniqueCount >= totalLessons;
+
+  if (enrollment.completed && !enrollment.completedAt) {
+    enrollment.completedAt = new Date();
+  }
+
+  if (!enrollment.completed) {
+    enrollment.completedAt = null;
+  }
 
   await enrollment.save();
 
@@ -277,7 +500,10 @@ export const getStudentProgressDetail = async (
     .populate("assignmentId")
     .sort({ createdAt: -1 });
 
-  const totalLessons = Array.isArray(course.lessonIds) ? course.lessonIds.length : 0;
+  const totalLessons = Array.isArray(course.lessonIds)
+    ? course.lessonIds.length
+    : 0;
+
   const completedLessonsCount = new Set(
     (enrollment.completedLessons || []).map((item) => toStringId(item))
   ).size;
@@ -287,8 +513,7 @@ export const getStudentProgressDetail = async (
     totalLessons,
     completedLessonsCount,
     progressPercent: calcProgress(totalLessons, completedLessonsCount),
-    isCompleted:
-      totalLessons > 0 && completedLessonsCount >= totalLessons,
+    isCompleted: totalLessons > 0 && completedLessonsCount >= totalLessons,
     quizAttempts,
     assignmentSubmissions,
   };

@@ -8,12 +8,22 @@ import {
   completeLesson,
   getStudentsByCourse,
   getStudentProgressDetail,
+  getStudentDashboardSummary,
+  getInstructorDashboardSummary,
 } from "./enrollment.controller.js";
-import { verifyToken } from "../../config/jwt.js";
+import { verifyToken } from "../../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
 router.post("/enroll", verifyToken, enrollCourse);
+
+// dashboard
+router.get("/dashboard/student/:studentId", verifyToken, getStudentDashboardSummary);
+router.get(
+  "/dashboard/instructor/:instructorId",
+  verifyToken,
+  getInstructorDashboardSummary
+);
 
 // student
 router.get("/student/:studentId", verifyToken, getMyCourses);

@@ -31,5 +31,5 @@ const reviewSchema = new mongoose.Schema(
 
 reviewSchema.index({ courseId: 1, studentId: 1 }, { unique: true });
 
-const Review = mongoose.model("Review", reviewSchema);
+const Review = mongoose.models.Review || mongoose.model("Review", reviewSchema);
 export default Review;

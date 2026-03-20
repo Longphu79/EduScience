@@ -30,10 +30,50 @@ const userSchema = new mongoose.Schema(
       default: "student",
     },
 
+    fullName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     avatarUrl: {
       type: String,
       default:
         "https://i.pinimg.com/1200x/dc/6c/b0/dc6cb0521d182f959da46aaee82e742f.jpg",
+    },
+
+    coverImageUrl: {
+      type: String,
+      default: "",
+    },
+
+    headline: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    bio: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 500,
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    expertise: {
+      type: [String],
+      default: [],
+    },
+
+    learningGoals: {
+      type: [String],
+      default: [],
     },
 
     isActive: {

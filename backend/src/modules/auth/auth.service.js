@@ -4,12 +4,36 @@ import Instructor from "../../models/Instructor.js";
 import Student from "../../models/Student.js";
 import { signToken } from "../../config/jwt.js";
 
+function sanitizeUser(userDoc) {
+  if (!userDoc) return null;
+
+  const user = userDoc.toObject ? userDoc.toObject() : userDoc;
+  delete user.password;
+  return user;
+}
+
 export const register = async ({ username, email, password, role }) => {
   const normalizedUsername = username?.trim().toLowerCase();
   const normalizedEmail = email?.trim()?.toLowerCase() || undefined;
+  const normalizedRole = role?.trim().toLowerCase();
 
-  if (!normalizedUsername || !password || !role) {
+  if (!normalizedUsername || !password || !normalizedRole) {
     throw new Error("Username, password and role are required");
+  }
+
+  if (String(password).trim().length < 6) {
+    throw new Error("Password must be at least 6 characters");
+  }
+
+  if (!["student", "instructor", "admin"].includes(normalizedRole)) {
+    throw new Error("Role is invalid");
+  }
+
+  if (
+    normalizedEmail &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
+  ) {
+    throw new Error("Email is invalid");
   }
 
   const existingUsername = await User.findOne({ username: normalizedUsername });
@@ -30,17 +54,17 @@ export const register = async ({ username, email, password, role }) => {
     username: normalizedUsername,
     email: normalizedEmail,
     password: hashedPassword,
-    role,
+    role: normalizedRole,
   });
 
-  if (role === "instructor") {
+  if (normalizedRole === "instructor") {
     await Instructor.create({
       userId: user._id,
       name: normalizedUsername,
     });
   }
 
-  if (role === "student") {
+  if (normalizedRole === "student") {
     await Student.create({
       userId: user._id,
       fullName: normalizedUsername,
@@ -54,7 +78,10 @@ export const register = async ({ username, email, password, role }) => {
 
   const safeUser = await User.findById(user._id);
 
-  return { user: safeUser, token };
+  return {
+    user: sanitizeUser(safeUser),
+    token,
+  };
 };
 
 export const login = async ({ username, password }) => {
@@ -72,6 +99,10 @@ export const login = async ({ username, password }) => {
     throw new Error("Username or password is invalid");
   }
 
+  if (!user.isActive) {
+    throw new Error("Your account has been deactivated");
+  }
+
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     throw new Error("Username or password is invalid");
@@ -84,5 +115,8 @@ export const login = async ({ username, password }) => {
 
   const safeUser = await User.findById(user._id);
 
-  return { user: safeUser, token };
+  return {
+    user: sanitizeUser(safeUser),
+    token,
+  };
 };

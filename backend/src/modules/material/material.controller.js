@@ -1,4 +1,5 @@
 import * as materialService from "./material.service.js";
+import { sendSuccess, sendError } from "../../utils/response.js";
 
 function getRequester(req) {
   return {
@@ -13,15 +14,15 @@ export const createMaterial = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can create material",
       });
     }
@@ -31,8 +32,8 @@ export const createMaterial = async (req, res) => {
       requesterRole,
     });
 
-    return res.status(201).json({
-      success: true,
+    return sendSuccess(res, {
+      statusCode: 201,
       message: "Create material successfully",
       data,
     });
@@ -44,8 +45,8 @@ export const createMaterial = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -60,8 +61,8 @@ export const getMaterialsByCourse = async (req, res) => {
       user
     );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get materials by course successfully",
       data,
     });
   } catch (err) {
@@ -72,8 +73,8 @@ export const getMaterialsByCourse = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -83,13 +84,13 @@ export const getMaterialsByLesson = async (req, res) => {
   try {
     const data = await materialService.getMaterialsByLesson(req.params.lessonId);
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get materials by lesson successfully",
       data,
     });
   } catch (err) {
-    return res.status(400).json({
-      success: false,
+    return sendError(res, {
+      statusCode: 400,
       message: err.message,
     });
   }
@@ -100,15 +101,15 @@ export const updateMaterial = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can update material",
       });
     }
@@ -122,8 +123,7 @@ export const updateMaterial = async (req, res) => {
       }
     );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Update material successfully",
       data,
     });
@@ -137,8 +137,8 @@ export const updateMaterial = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -149,15 +149,15 @@ export const deleteMaterial = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can delete material",
       });
     }
@@ -167,8 +167,7 @@ export const deleteMaterial = async (req, res) => {
       requesterRole,
     });
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Delete material successfully",
       data,
     });
@@ -182,8 +181,8 @@ export const deleteMaterial = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }

@@ -20,22 +20,42 @@ const assignmentSubmissionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-
-    submissionText: { type: String, default: "" },
-    fileUrls: [{ type: String }],
-
-    submittedAt: { type: Date, default: Date.now },
-    resubmittedAt: { type: Date, default: null },
-
+    submissionText: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    fileUrls: {
+      type: [String],
+      default: [],
+    },
+    submittedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    resubmittedAt: {
+      type: Date,
+      default: null,
+    },
     status: {
       type: String,
       enum: ["submitted", "resubmitted", "graded", "overdue"],
       default: "submitted",
     },
-
-    grade: { type: Number, default: null },
-    feedback: { type: String, default: "" },
-    gradedAt: { type: Date, default: null },
+    grade: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    feedback: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    gradedAt: {
+      type: Date,
+      default: null,
+    },
     gradedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -50,9 +70,7 @@ assignmentSubmissionSchema.index(
   { unique: true }
 );
 
-const AssignmentSubmission = mongoose.model(
-  "AssignmentSubmission",
-  assignmentSubmissionSchema
-);
+assignmentSubmissionSchema.index({ courseId: 1, studentId: 1, createdAt: -1 });
 
-export default AssignmentSubmission;
+export default mongoose.models.AssignmentSubmission ||
+  mongoose.model("AssignmentSubmission", assignmentSubmissionSchema);

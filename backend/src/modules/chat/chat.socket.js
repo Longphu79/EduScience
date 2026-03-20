@@ -5,7 +5,10 @@ import {
   createMessageByConversation,
   getConversationRoom,
   getUserRoom,
+  getMyUnreadSummary,
+  markConversationAsRead,
 } from "./chat.service.js";
+import ChatConversation from "./chatConversation.model.js";
 
 function extractSocketToken(socket) {
   const authToken = socket.handshake?.auth?.token;
@@ -24,6 +27,13 @@ function extractSocketToken(socket) {
 
 function getSocketUserId(user) {
   return user?._id || user?.userId || user?.id || null;
+}
+
+async function buildConversationPayload(conversationId) {
+  return ChatConversation.findById(conversationId)
+    .populate("studentId", "username email fullName name avatarUrl")
+    .populate("instructorId", "username email fullName name avatarUrl")
+    .populate("courseId", "title thumbnail");
 }
 
 export function initChatSocket(server) {
@@ -87,6 +97,98 @@ export function initChatSocket(server) {
       socket.leave(getConversationRoom(conversationId));
     });
 
+    socket.on("chat:typing", async ({ conversationId }) => {
+      try {
+        if (!conversationId) return;
+
+        await canAccessConversation(conversationId, {
+          requesterId: currentUserId,
+          requesterRole: socket.user?.role,
+        });
+
+        socket.to(getConversationRoom(conversationId)).emit("chat:typing", {
+          conversationId,
+          userId: currentUserId,
+        });
+      } catch (error) {
+        socket.emit("chat:error", {
+          message: error.message || "Failed to send typing event",
+        });
+      }
+    });
+
+    socket.on("chat:stop-typing", async ({ conversationId }) => {
+      try {
+        if (!conversationId) return;
+
+        await canAccessConversation(conversationId, {
+          requesterId: currentUserId,
+          requesterRole: socket.user?.role,
+        });
+
+        socket.to(getConversationRoom(conversationId)).emit("chat:stop-typing", {
+          conversationId,
+          userId: currentUserId,
+        });
+      } catch (error) {
+        socket.emit("chat:error", {
+          message: error.message || "Failed to send stop typing event",
+        });
+      }
+    });
+
+    socket.on("chat:mark-read", async ({ conversationId }) => {
+      try {
+        if (!conversationId) return;
+
+        const conversation = await canAccessConversation(conversationId, {
+          requesterId: currentUserId,
+          requesterRole: socket.user?.role,
+        });
+
+        await markConversationAsRead(conversationId, {
+          requesterId: currentUserId,
+          requesterRole: socket.user?.role,
+        });
+
+        const updatedConversation = await buildConversationPayload(conversationId);
+
+        io.to(getUserRoom(conversation.studentId)).emit(
+          "chat:conversation-updated",
+          updatedConversation
+        );
+
+        io.to(getUserRoom(conversation.instructorId)).emit(
+          "chat:conversation-updated",
+          updatedConversation
+        );
+
+        const studentUnread = await getMyUnreadSummary({
+          requesterId: conversation.studentId,
+          requesterRole: "student",
+        });
+
+        const instructorUnread = await getMyUnreadSummary({
+          requesterId: conversation.instructorId,
+          requesterRole: "instructor",
+        });
+
+        io.to(getUserRoom(conversation.studentId)).emit("chat:unread-updated", {
+          unreadMessages: Number(studentUnread?.unreadMessages || 0),
+          unreadConversations: Number(studentUnread?.unreadConversations || 0),
+        });
+
+        io.to(getUserRoom(conversation.instructorId)).emit("chat:unread-updated", {
+          unreadMessages: Number(instructorUnread?.unreadMessages || 0),
+          unreadConversations: Number(instructorUnread?.unreadConversations || 0),
+        });
+      } catch (error) {
+        socket.emit("chat:error", {
+          message: error.message || "Failed to mark conversation as read",
+        });
+      }
+    });
+
     socket.on("chat:send", async (payload = {}, ack) => {
       try {
         const { conversationId, message, tempId } = payload;
@@ -102,27 +204,44 @@ export function initChatSocket(server) {
           message,
         });
 
-        const conversationPayload = {
-          _id: String(conversation._id),
-          courseId: String(conversation.courseId),
-          studentId: String(conversation.studentId),
-          instructorId: String(conversation.instructorId),
-          lastMessage: created?.message || "",
-          lastMessageAt: created?.createdAt || new Date(),
-        };
+        const updatedConversation = await buildConversationPayload(conversationId);
 
-        // Chỉ bắn cho người khác trong room, không bắn lại cho chính sender
         socket.to(getConversationRoom(conversationId)).emit("chat:message", created);
+
+        socket.to(getConversationRoom(conversationId)).emit("chat:stop-typing", {
+          conversationId,
+          userId: currentUserId,
+        });
 
         io.to(getUserRoom(conversation.studentId)).emit(
           "chat:conversation-updated",
-          conversationPayload
+          updatedConversation
         );
 
         io.to(getUserRoom(conversation.instructorId)).emit(
           "chat:conversation-updated",
-          conversationPayload
+          updatedConversation
         );
+
+        const studentUnread = await getMyUnreadSummary({
+          requesterId: conversation.studentId,
+          requesterRole: "student",
+        });
+
+        const instructorUnread = await getMyUnreadSummary({
+          requesterId: conversation.instructorId,
+          requesterRole: "instructor",
+        });
+
+        io.to(getUserRoom(conversation.studentId)).emit("chat:unread-updated", {
+          unreadMessages: Number(studentUnread?.unreadMessages || 0),
+          unreadConversations: Number(studentUnread?.unreadConversations || 0),
+        });
+
+        io.to(getUserRoom(conversation.instructorId)).emit("chat:unread-updated", {
+          unreadMessages: Number(instructorUnread?.unreadMessages || 0),
+          unreadConversations: Number(instructorUnread?.unreadConversations || 0),
+        });
 
         if (typeof ack === "function") {
           ack({

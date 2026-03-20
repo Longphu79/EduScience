@@ -5,8 +5,7 @@ import {
   updateReview,
   deleteReview,
 } from "./review.controller.js";
-import { verifyToken } from "../../config/jwt.js";
-
+import { verifyToken } from "../../middlewares/auth.middleware.js";
 const router = express.Router();
 
 router.get("/course/:courseId", getReviewsByCourse);

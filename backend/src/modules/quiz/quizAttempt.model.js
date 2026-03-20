@@ -114,5 +114,11 @@ const quizAttemptSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-const QuizAttempt = mongoose.model("QuizAttempt", quizAttemptSchema);
+quizAttemptSchema.index({ quizId: 1, studentId: 1, submittedAt: -1 });
+quizAttemptSchema.index({ courseId: 1, studentId: 1, submittedAt: -1 });
+
+const QuizAttempt =
+  mongoose.models.QuizAttempt ||
+  mongoose.model("QuizAttempt", quizAttemptSchema);
+
 export default QuizAttempt;

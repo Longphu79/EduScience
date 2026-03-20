@@ -30,6 +30,16 @@ const chatConversationSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    studentUnreadCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    instructorUnreadCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );

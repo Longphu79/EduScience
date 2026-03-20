@@ -3,14 +3,17 @@ import {
   ensureConversation,
   getInstructorConversationsByCourse,
   getMyConversations,
+  getMyUnreadSummary,
   getConversationMessages,
   createMessageByConversation,
+  markConversationAsRead,
 } from "./chat.controller.js";
-import { verifyToken } from "../../config/jwt.js";
+import { verifyToken } from "../../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
 router.get("/conversations/my", verifyToken, getMyConversations);
+router.get("/conversations/unread-summary", verifyToken, getMyUnreadSummary);
 
 router.post("/course/:courseId/conversation", verifyToken, ensureConversation);
 
@@ -30,6 +33,12 @@ router.post(
   "/conversation/:conversationId/messages",
   verifyToken,
   createMessageByConversation
+);
+
+router.post(
+  "/conversation/:conversationId/read",
+  verifyToken,
+  markConversationAsRead
 );
 
 export default router;

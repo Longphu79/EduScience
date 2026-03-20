@@ -273,9 +273,25 @@ export async function createMessageByConversation(
     message: normalizedMessage,
   });
 
-  await ChatConversation.findByIdAndUpdate(conversation._id, {
+  const update = {
     lastMessage: normalizedMessage,
     lastMessageAt: new Date(),
+  };
+
+  if (normalizeId(conversation.studentId) === normalizeId(requesterId)) {
+    update.studentUnreadCount = 0;
+    update.instructorUnreadCount =
+      Number(conversation.instructorUnreadCount || 0) + 1;
+  } else if (
+    normalizeId(conversation.instructorId) === normalizeId(requesterId)
+  ) {
+    update.instructorUnreadCount = 0;
+    update.studentUnreadCount =
+      Number(conversation.studentUnreadCount || 0) + 1;
+  }
+
+  await ChatConversation.findByIdAndUpdate(conversation._id, {
+    $set: update,
   });
 
   return ChatMessage.findById(created._id).populate(
@@ -290,4 +306,80 @@ export function getConversationRoom(conversationId) {
 
 export function getUserRoom(userId) {
   return `user:${normalizeId(userId)}`;
+}
+
+export async function markConversationAsRead(
+  conversationId,
+  { requesterId, requesterRole } = {}
+) {
+  const conversation = await canAccessConversation(conversationId, {
+    requesterId,
+    requesterRole,
+  });
+
+  const update = {};
+
+  if (normalizeId(conversation.studentId) === normalizeId(requesterId)) {
+    update.studentUnreadCount = 0;
+  }
+
+  if (normalizeId(conversation.instructorId) === normalizeId(requesterId)) {
+    update.instructorUnreadCount = 0;
+  }
+
+  await ChatConversation.findByIdAndUpdate(conversationId, {
+    $set: update,
+  });
+
+  return ChatConversation.findById(conversationId)
+    .populate("studentId", "username email fullName name avatarUrl")
+    .populate("instructorId", "username email fullName name avatarUrl")
+    .populate("courseId", "title thumbnail");
+}
+
+export async function getMyUnreadSummary({ requesterId, requesterRole } = {}) {
+  if (!requesterId) {
+    throw new Error("Unauthorized");
+  }
+
+  let conversations = [];
+
+  if (requesterRole === "student") {
+    conversations = await ChatConversation.find({
+      studentId: requesterId,
+      studentUnreadCount: { $gt: 0 },
+    }).lean();
+
+    return {
+      unreadConversations: conversations.length,
+      unreadMessages: conversations.reduce(
+        (sum, item) => sum + Number(item.studentUnreadCount || 0),
+        0
+      ),
+    };
+  }
+
+  if (requesterRole === "instructor") {
+    conversations = await ChatConversation.find({
+      instructorId: requesterId,
+      instructorUnreadCount: { $gt: 0 },
+    }).lean();
+
+    return {
+      unreadConversations: conversations.length,
+      unreadMessages: conversations.reduce(
+        (sum, item) => sum + Number(item.instructorUnreadCount || 0),
+        0
+      ),
+    };
+  }
+
+  if (requesterRole === "admin") {
+    return {
+      unreadConversations: 0,
+      unreadMessages: 0,
+    };
+  }
+
+  throw new Error("You are not allowed to access unread summary");
 }

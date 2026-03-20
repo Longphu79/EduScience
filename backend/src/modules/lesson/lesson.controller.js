@@ -1,4 +1,5 @@
 import * as lessonService from "./lesson.service.js";
+import { sendSuccess, sendError } from "../../utils/response.js";
 
 function getRequester(req) {
   return {
@@ -12,15 +13,15 @@ export const createLesson = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can create lesson",
       });
     }
@@ -30,8 +31,8 @@ export const createLesson = async (req, res) => {
       requesterRole,
     });
 
-    return res.status(201).json({
-      success: true,
+    return sendSuccess(res, {
+      statusCode: 201,
       message: "Create lesson successfully",
       data,
     });
@@ -43,8 +44,8 @@ export const createLesson = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -55,15 +56,15 @@ export const updateLesson = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can update lesson",
       });
     }
@@ -73,8 +74,7 @@ export const updateLesson = async (req, res) => {
       requesterRole,
     });
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Update lesson successfully",
       data,
     });
@@ -88,8 +88,8 @@ export const updateLesson = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -100,15 +100,15 @@ export const deleteLesson = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can delete lesson",
       });
     }
@@ -118,8 +118,7 @@ export const deleteLesson = async (req, res) => {
       requesterRole,
     });
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Delete lesson successfully",
       data,
     });
@@ -133,8 +132,8 @@ export const deleteLesson = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -144,13 +143,13 @@ export const getLessonsByCourse = async (req, res) => {
   try {
     const data = await lessonService.getLessonsByCourse(req.params.courseId);
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get lessons successfully",
       data,
     });
   } catch (err) {
-    return res.status(400).json({
-      success: false,
+    return sendError(res, {
+      statusCode: 400,
       message: err.message,
     });
   }

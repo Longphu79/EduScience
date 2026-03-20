@@ -1,4 +1,5 @@
 import * as certificateService from "./certificate.service.js";
+import { sendSuccess, sendError } from "../../utils/response.js";
 
 export const generateCertificate = async (req, res) => {
   try {
@@ -6,30 +7,34 @@ export const generateCertificate = async (req, res) => {
     const requesterRole = req.user?.role;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "student" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["student", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only student or admin can generate certificate",
       });
     }
 
     const data = await certificateService.generateCertificate({
-      studentId: requesterRole === "admin" && req.body.studentId
-        ? req.body.studentId
-        : requesterId,
+      studentId:
+        requesterRole === "admin" && req.body.studentId
+          ? req.body.studentId
+          : requesterId,
       courseId: req.body.courseId,
       studentName:
-        req.body.studentName || req.user?.username || req.user?.email,
+        req.body.studentName ||
+        req.user?.fullName ||
+        req.user?.username ||
+        req.user?.email,
     });
 
-    res.status(201).json({
-      success: true,
+    return sendSuccess(res, {
+      statusCode: 201,
       message: "Generate certificate successfully",
       data,
     });
@@ -43,8 +48,8 @@ export const generateCertificate = async (req, res) => {
         ? 400
         : 400;
 
-    res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -57,18 +62,15 @@ export const getCertificateByCourseStudent = async (req, res) => {
     const { courseId, studentId } = req.params;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (
-      requesterRole !== "admin" &&
-      String(requesterId) !== String(studentId)
-    ) {
-      return res.status(403).json({
-        success: false,
+    if (requesterRole !== "admin" && String(requesterId) !== String(studentId)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "You are not allowed to view this certificate",
       });
     }
@@ -78,16 +80,15 @@ export const getCertificateByCourseStudent = async (req, res) => {
       studentId
     );
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Get certificate successfully",
       data,
     });
   } catch (err) {
     const status = err.message === "Certificate not found" ? 404 : 400;
 
-    res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -99,8 +100,8 @@ export const getCertificateById = async (req, res) => {
     const requesterRole = req.user?.role;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
@@ -109,26 +110,26 @@ export const getCertificateById = async (req, res) => {
       req.params.certificateId
     );
 
-    const isOwner = String(data.studentId?._id || data.studentId) === String(requesterId);
+    const isOwner =
+      String(data.studentId?._id || data.studentId) === String(requesterId);
     const isAdmin = requesterRole === "admin";
 
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 403,
         message: "You are not allowed to view this certificate",
       });
     }
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Get certificate by id successfully",
       data,
     });
   } catch (err) {
     const status = err.message === "Certificate not found" ? 404 : 400;
 
-    res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -138,16 +139,15 @@ export const getCertificateByCode = async (req, res) => {
   try {
     const data = await certificateService.getCertificateByCode(req.params.code);
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Get public certificate successfully",
       data,
     });
   } catch (err) {
     const status = err.message === "Certificate not found" ? 404 : 400;
 
-    res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }

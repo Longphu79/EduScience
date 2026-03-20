@@ -15,7 +15,39 @@ const cartPopulateOptions = {
 };
 
 async function getPopulatedCartById(cartId) {
-  return await Cart.findById(cartId).populate(cartPopulateOptions);
+  return Cart.findById(cartId).populate(cartPopulateOptions);
+}
+
+async function ensureCart(userId) {
+  let cart = await Cart.findOne({ user: userId });
+
+  if (!cart) {
+    cart = await Cart.create({
+      user: userId,
+      items: [],
+    });
+  }
+
+  return cart;
+}
+
+function getEffectiveCoursePrice(courseDoc) {
+  if (!courseDoc) return 0;
+  if (courseDoc.isFree === true || Number(courseDoc.price || 0) === 0) return 0;
+
+  if (Number(courseDoc.salePrice) > 0) {
+    return Number(courseDoc.salePrice);
+  }
+
+  return Number(courseDoc.price || 0);
+}
+
+function buildSkippedCourse(courseId, courseDoc, reason) {
+  return {
+    courseId: String(courseId || ""),
+    title: courseDoc?.title || "",
+    reason,
+  };
 }
 
 export const getCart = async (userId) => {
@@ -56,6 +88,10 @@ export const addCourseToCart = async (userId, courseId, quantity = 1) => {
     throw new Error("Course not available");
   }
 
+  if (String(course.instructorId) === String(userId)) {
+    throw new Error("Instructor cannot add own course to cart");
+  }
+
   const isFreeCourse =
     course.isFree === true || Number(course.price || 0) === 0;
 
@@ -80,7 +116,7 @@ export const addCourseToCart = async (userId, courseId, quantity = 1) => {
       items: [{ course: courseId, quantity: nextQuantity }],
     });
 
-    return await getPopulatedCartById(cart._id);
+    return getPopulatedCartById(cart._id);
   }
 
   const existingItem = cart.items.find(
@@ -98,7 +134,7 @@ export const addCourseToCart = async (userId, courseId, quantity = 1) => {
 
   await cart.save();
 
-  return await getPopulatedCartById(cart._id);
+  return getPopulatedCartById(cart._id);
 };
 
 export const removeCourseFromCart = async (userId, courseId) => {
@@ -110,14 +146,7 @@ export const removeCourseFromCart = async (userId, courseId) => {
     throw new Error("Invalid courseId");
   }
 
-  let cart = await Cart.findOne({ user: userId });
-
-  if (!cart) {
-    cart = await Cart.create({
-      user: userId,
-      items: [],
-    });
-  }
+  const cart = await ensureCart(userId);
 
   cart.items = cart.items.filter(
     (item) => String(item.course) !== String(courseId)
@@ -125,7 +154,7 @@ export const removeCourseFromCart = async (userId, courseId) => {
 
   await cart.save();
 
-  return await getPopulatedCartById(cart._id);
+  return getPopulatedCartById(cart._id);
 };
 
 export const updateCartItemQuantity = async (userId, courseId, quantity) => {
@@ -161,7 +190,7 @@ export const updateCartItemQuantity = async (userId, courseId, quantity) => {
 
   await cart.save();
 
-  return await getPopulatedCartById(cart._id);
+  return getPopulatedCartById(cart._id);
 };
 
 export const clearCart = async (userId) => {
@@ -169,19 +198,11 @@ export const clearCart = async (userId) => {
     throw new Error("Invalid userId");
   }
 
-  let cart = await Cart.findOne({ user: userId });
+  const cart = await ensureCart(userId);
+  cart.items = [];
+  await cart.save();
 
-  if (!cart) {
-    cart = await Cart.create({
-      user: userId,
-      items: [],
-    });
-  } else {
-    cart.items = [];
-    await cart.save();
-  }
-
-  return await getPopulatedCartById(cart._id);
+  return getPopulatedCartById(cart._id);
 };
 
 export const checkoutCart = async (userId) => {
@@ -197,16 +218,17 @@ export const checkoutCart = async (userId) => {
 
   const purchasedCourses = [];
   const skippedCourses = [];
+  const processedCourseIds = new Set();
 
   for (const item of cart.items) {
     const courseDoc = item?.course;
     const courseId = courseDoc?._id || item?.course;
 
     if (!courseDoc || !courseId) {
-      skippedCourses.push({
-        courseId: String(courseId || ""),
-        reason: "Course not found",
-      });
+      skippedCourses.push(
+        buildSkippedCourse(courseId, null, "Course not found")
+      );
+      if (courseId) processedCourseIds.add(String(courseId));
       continue;
     }
 
@@ -214,20 +236,26 @@ export const checkoutCart = async (userId) => {
       courseDoc.isFree === true || Number(courseDoc.price || 0) === 0;
 
     if (courseDoc.status !== "published") {
-      skippedCourses.push({
-        courseId: String(courseId),
-        title: courseDoc.title,
-        reason: "Course not available",
-      });
+      skippedCourses.push(
+        buildSkippedCourse(courseId, courseDoc, "Course not available")
+      );
+      processedCourseIds.add(String(courseId));
+      continue;
+    }
+
+    if (String(courseDoc.instructorId) === String(userId)) {
+      skippedCourses.push(
+        buildSkippedCourse(courseId, courseDoc, "Instructor cannot purchase own course")
+      );
+      processedCourseIds.add(String(courseId));
       continue;
     }
 
     if (isFreeCourse) {
-      skippedCourses.push({
-        courseId: String(courseId),
-        title: courseDoc.title,
-        reason: "Free course should be enrolled directly",
-      });
+      skippedCourses.push(
+        buildSkippedCourse(courseId, courseDoc, "Free course should be enrolled directly")
+      );
+      processedCourseIds.add(String(courseId));
       continue;
     }
 
@@ -237,11 +265,10 @@ export const checkoutCart = async (userId) => {
     });
 
     if (existingEnrollment) {
-      skippedCourses.push({
-        courseId: String(courseId),
-        title: courseDoc.title,
-        reason: "Already enrolled",
-      });
+      skippedCourses.push(
+        buildSkippedCourse(courseId, courseDoc, "Already enrolled")
+      );
+      processedCourseIds.add(String(courseId));
       continue;
     }
 
@@ -253,15 +280,18 @@ export const checkoutCart = async (userId) => {
     purchasedCourses.push({
       courseId: String(courseId),
       title: courseDoc.title,
-      pricePaid:
-        Number(courseDoc.salePrice) > 0
-          ? Number(courseDoc.salePrice)
-          : Number(courseDoc.price || 0),
+      pricePaid: getEffectiveCoursePrice(courseDoc),
       quantity: Number(item.quantity || 1),
     });
+
+    processedCourseIds.add(String(courseId));
   }
 
-  cart.items = [];
+  cart.items = cart.items.filter((item) => {
+    const rawCourseId = item?.course?._id || item?.course;
+    return !processedCourseIds.has(String(rawCourseId));
+  });
+
   await cart.save();
 
   const refreshedCart = await getPopulatedCartById(cart._id);

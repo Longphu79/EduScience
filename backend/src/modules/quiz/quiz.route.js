@@ -14,8 +14,7 @@ import {
   updateQuiz,
   deleteQuiz,
 } from "./quiz.controller.js";
-import { verifyToken } from "../../config/jwt.js";
-
+import { verifyToken } from "../../middlewares/auth.middleware.js";
 const router = express.Router();
 
 /* instructor/admin routes */

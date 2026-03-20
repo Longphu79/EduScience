@@ -61,10 +61,14 @@ export const createReview = async (payload) => {
 
   const rating = Number(payload.rating);
 
+  if (Number.isNaN(rating)) {
+    throw new Error("Rating is required");
+  }
+
   const review = await Review.create({
     courseId: payload.courseId,
     studentId: payload.studentId,
-    rating: Number.isNaN(rating) ? 5 : Math.min(5, Math.max(1, rating)),
+    rating: Math.min(5, Math.max(1, rating)),
     comment: payload.comment?.trim() || "",
   });
 
@@ -82,6 +86,7 @@ export const updateReview = async (
   { requesterId, requesterRole } = {}
 ) => {
   const review = await Review.findById(reviewId);
+
   if (!review) {
     throw new Error("Review not found");
   }
@@ -95,6 +100,7 @@ export const updateReview = async (
 
   if (payload.rating !== undefined) {
     const rating = Number(payload.rating);
+
     if (!Number.isNaN(rating)) {
       review.rating = Math.min(5, Math.max(1, rating));
     }
@@ -118,6 +124,7 @@ export const deleteReview = async (
   { requesterId, requesterRole } = {}
 ) => {
   const review = await Review.findById(reviewId);
+
   if (!review) {
     throw new Error("Review not found");
   }

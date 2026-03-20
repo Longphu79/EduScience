@@ -4,9 +4,31 @@ import Course from "../course/course.model.js";
 import User from "../user/user.model.js";
 
 function generateCertificateCode(courseId, studentId) {
-  return `CERT-${String(courseId).slice(-6).toUpperCase()}-${String(studentId)
-    .slice(-6)
-    .toUpperCase()}-${Date.now()}`;
+  const coursePart = String(courseId).slice(-6).toUpperCase();
+  const studentPart = String(studentId).slice(-6).toUpperCase();
+  const timePart = Date.now();
+  return `CERT-${coursePart}-${studentPart}-${timePart}`;
+}
+
+function getDisplayStudentName(user, fallbackName = "") {
+  return (
+    fallbackName ||
+    user?.fullName ||
+    user?.name ||
+    user?.username ||
+    user?.email ||
+    "Student"
+  );
+}
+
+function getDisplayInstructorName(user) {
+  return (
+    user?.fullName ||
+    user?.name ||
+    user?.username ||
+    user?.email ||
+    "Instructor"
+  );
 }
 
 export const generateCertificate = async ({
@@ -23,7 +45,7 @@ export const generateCertificate = async ({
     throw new Error("Enrollment not found");
   }
 
-  if (Number(enrollment.progress) < 100 && !enrollment.completed) {
+  if (Number(enrollment.progress || 0) < 100 && !enrollment.completed) {
     throw new Error("Course not completed");
   }
 
@@ -41,16 +63,18 @@ export const generateCertificate = async ({
     throw new Error("Course not found");
   }
 
-  const user = await User.findById(studentId);
+  const student = await User.findById(studentId);
+  const instructor = await User.findById(course.instructorId);
 
   const cert = await Certificate.create({
     certificateCode: generateCertificateCode(courseId, studentId),
     studentId,
     courseId,
     instructorId: course.instructorId,
-    studentName: studentName || user?.username || user?.email || "Student",
-    courseTitle: course.title,
-    completionDate: enrollment.updatedAt || new Date(),
+    studentName: getDisplayStudentName(student, studentName),
+    instructorName: getDisplayInstructorName(instructor),
+    courseTitle: course.title || "Completed Course",
+    completionDate: enrollment.completedAt || enrollment.updatedAt || new Date(),
     issuedAt: new Date(),
   });
 

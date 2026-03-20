@@ -1,37 +1,69 @@
 import * as cartService from "./cart.service.js";
+import { sendSuccess, sendError } from "../../utils/response.js";
 
 function getUserIdFromRequest(req) {
   return (
-    req.user?.userId ||
     req.user?._id ||
+    req.user?.userId ||
     req.user?.id ||
     req.user?.sub ||
     null
   );
 }
 
+function getUserRoleFromRequest(req) {
+  return req.user?.role || null;
+}
+
+function ensureCartAccess(req, res) {
+  const userId = getUserIdFromRequest(req);
+  const role = getUserRoleFromRequest(req);
+
+  if (!userId) {
+    sendError(res, {
+      statusCode: 401,
+      message: "Unauthorized",
+    });
+    return null;
+  }
+
+  if (!["student", "admin"].includes(role)) {
+    sendError(res, {
+      statusCode: 403,
+      message: "Only student or admin can use cart",
+    });
+    return null;
+  }
+
+  return { userId, role };
+}
+
+function getCartErrorStatus(err) {
+  if (!err?.message) return 400;
+
+  if (err.message === "Unauthorized") return 401;
+  if (err.message.includes("not allowed")) return 403;
+  if (err.message.includes("not found")) return 404;
+
+  return 400;
+}
+
 export const getMyCart = async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
+    const access = ensureCartAccess(req, res);
+    if (!access) return;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
+    const cart = await cartService.getCart(access.userId);
 
-    const cart = await cartService.getCart(userId);
-
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Cart fetched successfully",
       data: cart,
     });
   } catch (err) {
     console.error("getMyCart error:", err);
-    return res.status(500).json({
-      success: false,
+
+    return sendError(res, {
+      statusCode: getCartErrorStatus(err),
       message: err.message || "Failed to fetch cart",
     });
   }
@@ -39,34 +71,33 @@ export const getMyCart = async (req, res) => {
 
 export const addToCart = async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
+    const access = ensureCartAccess(req, res);
+    if (!access) return;
+
     const { courseId, quantity } = req.body;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
-    if (!courseId) {
-      return res.status(400).json({
-        success: false,
+    if (!courseId || typeof courseId !== "string") {
+      return sendError(res, {
+        statusCode: 400,
         message: "courseId is required",
       });
     }
 
-    const cart = await cartService.addCourseToCart(userId, courseId, quantity);
+    const cart = await cartService.addCourseToCart(
+      access.userId,
+      courseId,
+      quantity
+    );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Added to cart successfully",
       data: cart,
     });
   } catch (err) {
     console.error("addToCart error:", err);
-    return res.status(400).json({
-      success: false,
+
+    return sendError(res, {
+      statusCode: getCartErrorStatus(err),
       message: err.message || "Failed to add to cart",
     });
   }
@@ -74,34 +105,29 @@ export const addToCart = async (req, res) => {
 
 export const removeFromCart = async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
+    const access = ensureCartAccess(req, res);
+    if (!access) return;
+
     const { courseId } = req.params;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
-    if (!courseId) {
-      return res.status(400).json({
-        success: false,
+    if (!courseId || typeof courseId !== "string") {
+      return sendError(res, {
+        statusCode: 400,
         message: "courseId is required",
       });
     }
 
-    const cart = await cartService.removeCourseFromCart(userId, courseId);
+    const cart = await cartService.removeCourseFromCart(access.userId, courseId);
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Removed item from cart successfully",
       data: cart,
     });
   } catch (err) {
     console.error("removeFromCart error:", err);
-    return res.status(400).json({
-      success: false,
+
+    return sendError(res, {
+      statusCode: getCartErrorStatus(err),
       message: err.message || "Failed to remove item from cart",
     });
   }
@@ -109,38 +135,33 @@ export const removeFromCart = async (req, res) => {
 
 export const updateItemQuantity = async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
+    const access = ensureCartAccess(req, res);
+    if (!access) return;
+
     const { courseId, quantity } = req.body;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
-
-    if (!courseId) {
-      return res.status(400).json({
-        success: false,
+    if (!courseId || typeof courseId !== "string") {
+      return sendError(res, {
+        statusCode: 400,
         message: "courseId is required",
       });
     }
 
     const cart = await cartService.updateCartItemQuantity(
-      userId,
+      access.userId,
       courseId,
       quantity
     );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Cart item quantity updated successfully",
       data: cart,
     });
   } catch (err) {
     console.error("updateItemQuantity error:", err);
-    return res.status(400).json({
-      success: false,
+
+    return sendError(res, {
+      statusCode: getCartErrorStatus(err),
       message: err.message || "Failed to update cart quantity",
     });
   }
@@ -148,26 +169,20 @@ export const updateItemQuantity = async (req, res) => {
 
 export const clearMyCart = async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
+    const access = ensureCartAccess(req, res);
+    if (!access) return;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
+    const cart = await cartService.clearCart(access.userId);
 
-    const cart = await cartService.clearCart(userId);
-
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Cart cleared successfully",
       data: cart,
     });
   } catch (err) {
     console.error("clearMyCart error:", err);
-    return res.status(500).json({
-      success: false,
+
+    return sendError(res, {
+      statusCode: getCartErrorStatus(err),
       message: err.message || "Failed to clear cart",
     });
   }
@@ -175,26 +190,20 @@ export const clearMyCart = async (req, res) => {
 
 export const checkoutMyCart = async (req, res) => {
   try {
-    const userId = getUserIdFromRequest(req);
+    const access = ensureCartAccess(req, res);
+    if (!access) return;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized",
-      });
-    }
+    const result = await cartService.checkoutCart(access.userId);
 
-    const result = await cartService.checkoutCart(userId);
-
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Checkout completed successfully",
       data: result,
     });
   } catch (err) {
     console.error("checkoutMyCart error:", err);
-    return res.status(400).json({
-      success: false,
+
+    return sendError(res, {
+      statusCode: getCartErrorStatus(err),
       message: err.message || "Failed to checkout cart",
     });
   }

@@ -52,6 +52,7 @@ const courseSchema = new mongoose.Schema(
     language: {
       type: String,
       default: "vi",
+      trim: true,
     },
 
     duration: {
@@ -81,6 +82,7 @@ const courseSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
+      index: true,
     },
 
     rating: {
@@ -111,6 +113,7 @@ const courseSchema = new mongoose.Schema(
       type: String,
       enum: ["draft", "published", "archived"],
       default: "draft",
+      index: true,
     },
 
     lessonIds: [
@@ -129,4 +132,9 @@ const courseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Course", courseSchema);
+courseSchema.index({ slug: 1 }, { unique: true });
+courseSchema.index({ status: 1, createdAt: -1 });
+courseSchema.index({ instructorId: 1, createdAt: -1 });
+courseSchema.index({ isPopular: 1, status: 1, createdAt: -1 });
+
+export default mongoose.models.Course || mongoose.model("Course", courseSchema);

@@ -1,28 +1,67 @@
 import * as enrollmentService from "./enrollment.service.js";
+import { sendSuccess, sendError } from "../../utils/response.js";
+
+function getUserId(req) {
+  return req.user?._id || req.user?.userId || req.user?.id || null;
+}
+
+function getUserRole(req) {
+  return req.user?.role || null;
+}
+
+function getErrorStatus(err) {
+  if (!err?.message) return 400;
+
+  if (
+    err.message === "Course not found" ||
+    err.message === "Enrollment not found"
+  ) {
+    return 404;
+  }
+
+  if (
+    err.message.includes("not allowed") ||
+    err.message === "Instructor cannot enroll in own course"
+  ) {
+    return 403;
+  }
+
+  if (
+    err.message === "Course is not available for enrollment" ||
+    err.message === "You already enrolled in this course" ||
+    err.message ===
+      "Paid course must be purchased through cart checkout before enrollment" ||
+    err.message === "Lesson not found in this course"
+  ) {
+    return 400;
+  }
+
+  return 400;
+}
 
 export const enrollCourse = async (req, res) => {
   try {
-    const studentId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const studentId = getUserId(req);
+    const requesterRole = getUserRole(req);
     const { courseId } = req.body;
 
     if (!studentId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (!courseId) {
-      return res.status(400).json({
-        success: false,
+    if (!courseId || typeof courseId !== "string") {
+      return sendError(res, {
+        statusCode: 400,
         message: "courseId is required",
       });
     }
 
-    if (requesterRole !== "student" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["student", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only student or admin can enroll course",
       });
     }
@@ -32,40 +71,28 @@ export const enrollCourse = async (req, res) => {
       courseId,
     });
 
-    res.status(201).json({
-      success: true,
+    return sendSuccess(res, {
+      statusCode: 201,
       message: "Enroll course successfully",
       data: enrollment,
     });
   } catch (err) {
-    const status =
-      err.message === "Course not found"
-        ? 404
-        : err.message === "Course is not available for enrollment"
-        ? 400
-        : err.message === "You already enrolled in this course"
-        ? 400
-        : err.message ===
-          "Paid course must be purchased through cart checkout before enrollment"
-        ? 400
-        : 400;
-
-    res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
       message: err.message,
     });
   }
 };
 
-export const getMyCourses = async (req, res) => {
+export const getStudentDashboardSummary = async (req, res) => {
   try {
-    const requesterId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
     const { studentId } = req.params;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
@@ -74,36 +101,35 @@ export const getMyCourses = async (req, res) => {
       requesterRole !== "admin" &&
       String(requesterId) !== String(studentId)
     ) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not allowed to view these courses",
+      return sendError(res, {
+        statusCode: 403,
+        message: "You are not allowed to view this dashboard",
       });
     }
 
-    const myCourses = await enrollmentService.getMyCourses(studentId);
+    const data = await enrollmentService.getStudentDashboardSummary(studentId);
 
-    res.status(200).json({
-      success: true,
-      message: "Get my courses successfully",
-      data: myCourses,
+    return sendSuccess(res, {
+      message: "Get student dashboard summary successfully",
+      data,
     });
   } catch (err) {
-    res.status(400).json({
-      success: false,
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
       message: err.message,
     });
   }
 };
 
-export const getInstructorCourses = async (req, res) => {
+export const getInstructorDashboardSummary = async (req, res) => {
   try {
-    const requesterId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
     const { instructorId } = req.params;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
@@ -112,36 +138,37 @@ export const getInstructorCourses = async (req, res) => {
       requesterRole !== "admin" &&
       String(requesterId) !== String(instructorId)
     ) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not allowed to view these instructor courses",
+      return sendError(res, {
+        statusCode: 403,
+        message: "You are not allowed to view this dashboard",
       });
     }
 
-    const courses = await enrollmentService.getInstructorCourses(instructorId);
+    const data = await enrollmentService.getInstructorDashboardSummary(
+      instructorId
+    );
 
-    res.status(200).json({
-      success: true,
-      message: "Get instructor courses successfully",
-      data: courses,
+    return sendSuccess(res, {
+      message: "Get instructor dashboard summary successfully",
+      data,
     });
   } catch (err) {
-    res.status(400).json({
-      success: false,
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
       message: err.message,
     });
   }
 };
 
-export const getEnrollmentByStudentAndCourse = async (req, res) => {
+export const getMyCourses = async (req, res) => {
   try {
-    const requesterId = req.user?._id;
-    const requesterRole = req.user?.role;
-    const { studentId, courseId } = req.params;
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
+    const { studentId } = req.params;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
@@ -150,8 +177,82 @@ export const getEnrollmentByStudentAndCourse = async (req, res) => {
       requesterRole !== "admin" &&
       String(requesterId) !== String(studentId)
     ) {
-      return res.status(403).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 403,
+        message: "You are not allowed to view these courses",
+      });
+    }
+
+    const myCourses = await enrollmentService.getMyCourses(studentId);
+
+    return sendSuccess(res, {
+      message: "Get my courses successfully",
+      data: myCourses,
+    });
+  } catch (err) {
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
+      message: err.message,
+    });
+  }
+};
+
+export const getInstructorCourses = async (req, res) => {
+  try {
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
+    const { instructorId } = req.params;
+
+    if (!requesterId) {
+      return sendError(res, {
+        statusCode: 401,
+        message: "Unauthorized",
+      });
+    }
+
+    if (
+      requesterRole !== "admin" &&
+      String(requesterId) !== String(instructorId)
+    ) {
+      return sendError(res, {
+        statusCode: 403,
+        message: "You are not allowed to view these instructor courses",
+      });
+    }
+
+    const courses = await enrollmentService.getInstructorCourses(instructorId);
+
+    return sendSuccess(res, {
+      message: "Get instructor courses successfully",
+      data: courses,
+    });
+  } catch (err) {
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
+      message: err.message,
+    });
+  }
+};
+
+export const getEnrollmentByStudentAndCourse = async (req, res) => {
+  try {
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
+    const { studentId, courseId } = req.params;
+
+    if (!requesterId) {
+      return sendError(res, {
+        statusCode: 401,
+        message: "Unauthorized",
+      });
+    }
+
+    if (
+      requesterRole !== "admin" &&
+      String(requesterId) !== String(studentId)
+    ) {
+      return sendError(res, {
+        statusCode: 403,
         message: "You are not allowed to view this enrollment",
       });
     }
@@ -162,20 +263,19 @@ export const getEnrollmentByStudentAndCourse = async (req, res) => {
     );
 
     if (!enrollment) {
-      return res.status(404).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 404,
         message: "Enrollment not found",
       });
     }
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Get enrollment successfully",
       data: enrollment,
     });
   } catch (err) {
-    res.status(400).json({
-      success: false,
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
       message: err.message,
     });
   }
@@ -183,20 +283,20 @@ export const getEnrollmentByStudentAndCourse = async (req, res) => {
 
 export const setCurrentLesson = async (req, res) => {
   try {
-    const studentId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const studentId = getUserId(req);
+    const requesterRole = getUserRole(req);
     const { courseId, lessonId } = req.body;
 
     if (!studentId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "student" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["student", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only student or admin can set current lesson",
       });
     }
@@ -207,23 +307,13 @@ export const setCurrentLesson = async (req, res) => {
       lessonId,
     });
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Set current lesson successfully",
       data,
     });
   } catch (err) {
-    const status =
-      err.message === "Enrollment not found"
-        ? 404
-        : err.message === "Course not found"
-        ? 404
-        : err.message === "Lesson not found in this course"
-        ? 400
-        : 400;
-
-    res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
       message: err.message,
     });
   }
@@ -231,20 +321,20 @@ export const setCurrentLesson = async (req, res) => {
 
 export const completeLesson = async (req, res) => {
   try {
-    const studentId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const studentId = getUserId(req);
+    const requesterRole = getUserRole(req);
     const { courseId, lessonId } = req.body;
 
     if (!studentId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "student" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["student", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only student or admin can complete lesson",
       });
     }
@@ -255,23 +345,13 @@ export const completeLesson = async (req, res) => {
       lessonId,
     });
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Complete lesson successfully",
       data,
     });
   } catch (err) {
-    const status =
-      err.message === "Enrollment not found"
-        ? 404
-        : err.message === "Course not found"
-        ? 404
-        : err.message === "Lesson not found in this course"
-        ? 400
-        : 400;
-
-    res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
       message: err.message,
     });
   }
@@ -279,13 +359,13 @@ export const completeLesson = async (req, res) => {
 
 export const getStudentsByCourse = async (req, res) => {
   try {
-    const requesterId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
     const { courseId } = req.params;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
@@ -295,21 +375,13 @@ export const getStudentsByCourse = async (req, res) => {
       requesterRole,
     });
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Get students by course successfully",
       data,
     });
   } catch (err) {
-    const status =
-      err.message === "Course not found"
-        ? 404
-        : err.message.includes("not allowed")
-        ? 403
-        : 400;
-
-    res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
       message: err.message,
     });
   }
@@ -317,13 +389,13 @@ export const getStudentsByCourse = async (req, res) => {
 
 export const getStudentProgressDetail = async (req, res) => {
   try {
-    const requesterId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
     const { courseId, studentId } = req.params;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
@@ -337,23 +409,13 @@ export const getStudentProgressDetail = async (req, res) => {
       }
     );
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Get student progress detail successfully",
       data,
     });
   } catch (err) {
-    const status =
-      err.message === "Enrollment not found"
-        ? 404
-        : err.message === "Course not found"
-        ? 404
-        : err.message.includes("not allowed")
-        ? 403
-        : 400;
-
-    res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
       message: err.message,
     });
   }

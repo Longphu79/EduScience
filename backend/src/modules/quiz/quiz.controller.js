@@ -1,4 +1,5 @@
 import * as quizService from "./quiz.service.js";
+import { sendSuccess, sendError } from "../../utils/response.js";
 
 function getRequester(req) {
   return {
@@ -12,15 +13,15 @@ export const createQuiz = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can create quiz",
       });
     }
@@ -30,14 +31,26 @@ export const createQuiz = async (req, res) => {
       requesterRole,
     });
 
-    return res.status(201).json({
-      success: true,
+    return sendSuccess(res, {
+      statusCode: 201,
       message: "Create quiz successfully",
       data,
     });
   } catch (err) {
-    return res.status(400).json({
-      success: false,
+    const status =
+      err.message === "courseId is required" ||
+      err.message === "Quiz title is required" ||
+      err.message.includes("Question") ||
+      err.message.includes("Quiz must contain")
+        ? 400
+        : err.message === "Course not found"
+        ? 404
+        : err.message.includes("not allowed")
+        ? 403
+        : 400;
+
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -47,13 +60,13 @@ export const getQuizByCourse = async (req, res) => {
   try {
     const data = await quizService.getQuizByCourse(req.params.courseId);
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get quizzes by course successfully",
       data,
     });
   } catch (err) {
-    return res.status(400).json({
-      success: false,
+    return sendError(res, {
+      statusCode: 400,
       message: err.message,
     });
   }
@@ -64,15 +77,15 @@ export const getInstructorQuizzesByCourse = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can view instructor quizzes",
       });
     }
@@ -85,8 +98,8 @@ export const getInstructorQuizzesByCourse = async (req, res) => {
       }
     );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get instructor quizzes successfully",
       data,
     });
   } catch (err) {
@@ -97,8 +110,8 @@ export const getInstructorQuizzesByCourse = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -109,13 +122,15 @@ export const getQuizById = async (req, res) => {
     const hideAnswers = String(req.query.hideAnswers) === "true";
     const data = await quizService.getQuizById(req.params.quizId, hideAnswers);
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get quiz successfully",
       data,
     });
   } catch (err) {
-    return res.status(404).json({
-      success: false,
+    const status = err.message === "Quiz not found" ? 404 : 400;
+
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -126,15 +141,15 @@ export const submitQuizAttempt = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "student" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["student", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only student or admin can submit quiz attempt",
       });
     }
@@ -145,8 +160,9 @@ export const submitQuizAttempt = async (req, res) => {
       answers: req.body.answers || [],
     });
 
-    return res.status(201).json({
-      success: true,
+    return sendSuccess(res, {
+      statusCode: 201,
+      message: "Submit quiz attempt successfully",
       data,
     });
   } catch (err) {
@@ -157,8 +173,8 @@ export const submitQuizAttempt = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -171,20 +187,17 @@ export const getAttemptsByStudentCourse = async (req, res) => {
     const courseId = req.params.courseId;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
     const studentId = routeStudentId || requesterId;
 
-    if (
-      requesterRole !== "admin" &&
-      String(requesterId) !== String(studentId)
-    ) {
-      return res.status(403).json({
-        success: false,
+    if (requesterRole !== "admin" && String(requesterId) !== String(studentId)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "You are not allowed to view these attempts",
       });
     }
@@ -194,13 +207,13 @@ export const getAttemptsByStudentCourse = async (req, res) => {
       courseId
     );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get attempts by student and course successfully",
       data,
     });
   } catch (err) {
-    return res.status(400).json({
-      success: false,
+    return sendError(res, {
+      statusCode: 400,
       message: err.message,
     });
   }
@@ -212,15 +225,15 @@ export const getMyAttemptsByCourse = async (req, res) => {
     const { courseId } = req.params;
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "student" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["student", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only student or admin can view own attempts",
       });
     }
@@ -230,13 +243,13 @@ export const getMyAttemptsByCourse = async (req, res) => {
       courseId
     );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get my quiz attempts successfully",
       data,
     });
   } catch (err) {
-    return res.status(400).json({
-      success: false,
+    return sendError(res, {
+      statusCode: 400,
       message: err.message,
     });
   }
@@ -247,8 +260,8 @@ export const getAttemptReviewById = async (req, res) => {
     const { requesterId } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
@@ -258,8 +271,8 @@ export const getAttemptReviewById = async (req, res) => {
       requesterId
     );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get attempt review successfully",
       data,
     });
   } catch (err) {
@@ -270,8 +283,8 @@ export const getAttemptReviewById = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -282,29 +295,26 @@ export const getQuizResultsByQuizId = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can view quiz results",
       });
     }
 
-    const data = await quizService.getQuizResultsByQuizId(
-      req.params.quizId,
-      {
-        requesterId,
-        requesterRole,
-      }
-    );
+    const data = await quizService.getQuizResultsByQuizId(req.params.quizId, {
+      requesterId,
+      requesterRole,
+    });
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get quiz results successfully",
       data,
     });
   } catch (err) {
@@ -315,8 +325,8 @@ export const getQuizResultsByQuizId = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -327,15 +337,15 @@ export const getQuizAttemptsByQuizAndStudent = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can view quiz attempts",
       });
     }
@@ -349,8 +359,8 @@ export const getQuizAttemptsByQuizAndStudent = async (req, res) => {
       }
     );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get quiz attempts by quiz and student successfully",
       data,
     });
   } catch (err) {
@@ -361,8 +371,8 @@ export const getQuizAttemptsByQuizAndStudent = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -373,15 +383,15 @@ export const getInstructorAttemptReviewById = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can review student attempts",
       });
     }
@@ -394,8 +404,8 @@ export const getInstructorAttemptReviewById = async (req, res) => {
       }
     );
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Get instructor attempt review successfully",
       data,
     });
   } catch (err) {
@@ -406,8 +416,8 @@ export const getInstructorAttemptReviewById = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -418,15 +428,15 @@ export const updateQuiz = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can update quiz",
       });
     }
@@ -436,8 +446,7 @@ export const updateQuiz = async (req, res) => {
       requesterRole,
     });
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Update quiz successfully",
       data,
     });
@@ -447,10 +456,13 @@ export const updateQuiz = async (req, res) => {
         ? 404
         : err.message.includes("not allowed")
         ? 403
+        : err.message.includes("Question") ||
+          err.message.includes("Quiz must contain")
+        ? 400
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }
@@ -461,15 +473,15 @@ export const deleteQuiz = async (req, res) => {
     const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "instructor" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["instructor", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only instructor or admin can delete quiz",
       });
     }
@@ -479,8 +491,8 @@ export const deleteQuiz = async (req, res) => {
       requesterRole,
     });
 
-    return res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
+      message: "Delete quiz successfully",
       data,
     });
   } catch (err) {
@@ -491,8 +503,8 @@ export const deleteQuiz = async (req, res) => {
         ? 403
         : 400;
 
-    return res.status(status).json({
-      success: false,
+    return sendError(res, {
+      statusCode: status,
       message: err.message,
     });
   }

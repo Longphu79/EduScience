@@ -1,9 +1,96 @@
+import fs from "fs";
+import path from "path";
 import Assignment from "./assignment.model.js";
 import AssignmentSubmission from "./assignmentSubmission.model.js";
 import Course from "../course/course.model.js";
 import Enrollment from "../enrollment/enrollment.model.js";
 
-async function ensureCourseOwnership(courseId, { requesterId, requesterRole } = {}) {
+const ASSIGNMENT_UPLOAD_DIR = path.resolve(
+  process.cwd(),
+  "uploads",
+  "assignments"
+);
+
+function ensureArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null || value === "") return [];
+  return [value];
+}
+
+function normalizeUrlList(value) {
+  return ensureArray(value)
+    .flatMap((item) => {
+      if (typeof item !== "string") return [String(item || "").trim()];
+
+      const trimmed = item.trim();
+      if (!trimmed) return [];
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((x) => String(x || "").trim());
+        }
+      } catch {
+        // ignore JSON parse error
+      }
+
+      if (trimmed.includes(",")) {
+        return trimmed.split(",").map((x) => x.trim());
+      }
+
+      return [trimmed];
+    })
+    .filter(Boolean);
+}
+
+function safeDeleteFile(filePath) {
+  try {
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.error("safeDeleteFile error:", error.message);
+  }
+}
+
+function urlToLocalAssignmentPath(url = "") {
+  const normalized = String(url || "").trim();
+  if (!normalized) return null;
+
+  const marker = "/uploads/assignments/";
+  const markerIndex = normalized.indexOf(marker);
+
+  if (markerIndex === -1) return null;
+
+  const fileName = normalized.slice(markerIndex + marker.length).trim();
+  if (!fileName) return null;
+
+  return path.join(ASSIGNMENT_UPLOAD_DIR, fileName);
+}
+
+function cleanupRemovedFiles(previousUrls = [], nextUrls = []) {
+  const prev = new Set(normalizeUrlList(previousUrls));
+  const next = new Set(normalizeUrlList(nextUrls));
+
+  for (const url of prev) {
+    if (!next.has(url)) {
+      const localPath = urlToLocalAssignmentPath(url);
+      safeDeleteFile(localPath);
+    }
+  }
+}
+
+function cleanupAllFiles(urls = []) {
+  for (const url of normalizeUrlList(urls)) {
+    const localPath = urlToLocalAssignmentPath(url);
+    safeDeleteFile(localPath);
+  }
+}
+
+async function ensureCourseOwnership(
+  courseId,
+  { requesterId, requesterRole } = {}
+) {
   const course = await Course.findById(courseId);
 
   if (!course) {
@@ -40,10 +127,6 @@ async function ensureAssignmentOwnership(
   return assignment;
 }
 
-export const assignmentUnwrap = (res) => {
-  return res?.data ?? res ?? null;
-};
-
 export const createAssignment = async (
   payload,
   { requesterId, requesterRole } = {}
@@ -52,28 +135,33 @@ export const createAssignment = async (
     throw new Error("courseId is required");
   }
 
+  if (!payload?.title || !String(payload.title).trim()) {
+    throw new Error("title is required");
+  }
+
   await ensureCourseOwnership(payload.courseId, {
     requesterId,
     requesterRole,
   });
 
-  return await Assignment.create({
-    title: payload.title?.trim() || "",
-    description: payload.description?.trim() || "",
+  const created = await Assignment.create({
+    title: String(payload.title).trim(),
+    description: String(payload.description || "").trim(),
     courseId: payload.courseId,
     lessonId: payload.lessonId || null,
-    instructorId: requesterRole === "admin"
-      ? payload.instructorId || requesterId
-      : requesterId,
+    instructorId:
+      requesterRole === "admin"
+        ? payload.instructorId || requesterId
+        : requesterId,
     dueDate: payload.dueDate ? new Date(payload.dueDate) : null,
     allowResubmit: payload.allowResubmit !== false,
     maxScore: Number(payload.maxScore) || 100,
-    attachmentUrls: Array.isArray(payload.attachmentUrls)
-      ? payload.attachmentUrls
-      : [],
+    attachmentUrls: normalizeUrlList(payload.attachmentUrls),
     isPublished:
       typeof payload.isPublished === "boolean" ? payload.isPublished : true,
   });
+
+  return created;
 };
 
 export const getAssignmentsByCourse = async (courseId, user) => {
@@ -195,14 +283,16 @@ export const submitAssignment = async (assignmentId, payload) => {
     throw new Error("You have already submitted this assignment");
   }
 
-  return await AssignmentSubmission.create({
+  const created = await AssignmentSubmission.create({
     assignmentId,
     studentId: payload.studentId,
     courseId: assignment.courseId,
-    submissionText: payload.submissionText?.trim() || "",
-    fileUrls: Array.isArray(payload.fileUrls) ? payload.fileUrls : [],
+    submissionText: String(payload.submissionText || "").trim(),
+    fileUrls: normalizeUrlList(payload.fileUrls),
     status: "submitted",
   });
+
+  return created;
 };
 
 export const resubmitAssignment = async (assignmentId, payload) => {
@@ -231,8 +321,12 @@ export const resubmitAssignment = async (assignmentId, payload) => {
     throw new Error("No submission found to resubmit");
   }
 
-  submission.submissionText = payload.submissionText?.trim() || "";
-  submission.fileUrls = Array.isArray(payload.fileUrls) ? payload.fileUrls : [];
+  const nextFileUrls = normalizeUrlList(payload.fileUrls);
+
+  cleanupRemovedFiles(submission.fileUrls || [], nextFileUrls);
+
+  submission.submissionText = String(payload.submissionText || "").trim();
+  submission.fileUrls = nextFileUrls;
   submission.status = "resubmitted";
   submission.resubmittedAt = new Date();
 
@@ -248,6 +342,7 @@ export const getStudentSubmissions = async (
   if (requesterRole === "admin" || String(requesterId) === String(studentId)) {
     return await AssignmentSubmission.find({ studentId, courseId })
       .populate("assignmentId")
+      .populate("gradedBy", "username email fullName")
       .sort({ createdAt: -1 });
   }
 
@@ -260,6 +355,7 @@ export const getStudentSubmissions = async (
 
   return await AssignmentSubmission.find({ studentId, courseId })
     .populate("assignmentId")
+    .populate("gradedBy", "username email fullName")
     .sort({ createdAt: -1 });
 };
 
@@ -301,20 +397,30 @@ export const gradeSubmission = async (
     throw new Error("You are not allowed to grade this submission");
   }
 
+  if (payload?.grade === undefined || payload?.grade === null || payload?.grade === "") {
+    throw new Error("grade is required");
+  }
+
   const maxScore = Number(assignment.maxScore) || 100;
-  const normalizedGrade = Math.max(
-    0,
-    Math.min(maxScore, Number(payload.grade) || 0)
-  );
+  const rawGrade = Number(payload.grade);
+
+  if (Number.isNaN(rawGrade)) {
+    throw new Error("grade must be a valid number");
+  }
+
+  const normalizedGrade = Math.max(0, Math.min(maxScore, rawGrade));
 
   submission.grade = normalizedGrade;
-  submission.feedback = payload.feedback?.trim() || "";
+  submission.feedback = String(payload.feedback || "").trim();
   submission.status = "graded";
   submission.gradedAt = new Date();
   submission.gradedBy = payload.gradedBy || requesterId || null;
 
   await submission.save();
-  return submission;
+
+  return await AssignmentSubmission.findById(submission._id)
+    .populate("studentId", "username email fullName")
+    .populate("gradedBy", "username email fullName");
 };
 
 export const updateAssignment = async (
@@ -327,38 +433,43 @@ export const updateAssignment = async (
     requesterRole,
   });
 
-  const updatePayload = { ...payload };
+  const previousAttachmentUrls = normalizeUrlList(
+    existingAssignment.attachmentUrls
+  );
 
-  delete updatePayload.instructorId;
-  delete updatePayload.courseId;
-  delete updatePayload._id;
+  const updatePayload = {};
 
-  if (typeof payload.title === "string") {
-    updatePayload.title = payload.title.trim();
+  if (payload.title !== undefined) {
+    updatePayload.title = String(payload.title || "").trim();
   }
 
-  if (typeof payload.description === "string") {
-    updatePayload.description = payload.description.trim();
+  if (payload.description !== undefined) {
+    updatePayload.description = String(payload.description || "").trim();
   }
 
-  if (payload.dueDate) {
-    updatePayload.dueDate = new Date(payload.dueDate);
+  if (payload.dueDate !== undefined) {
+    updatePayload.dueDate =
+      payload.dueDate === "" || payload.dueDate === null
+        ? null
+        : new Date(payload.dueDate);
   }
 
   if (payload.maxScore !== undefined) {
     updatePayload.maxScore = Number(payload.maxScore) || 100;
   }
 
-  if (Array.isArray(payload.attachmentUrls)) {
-    updatePayload.attachmentUrls = payload.attachmentUrls;
+  if (payload.attachmentUrls !== undefined) {
+    updatePayload.attachmentUrls = normalizeUrlList(payload.attachmentUrls);
   }
 
   if (payload.allowResubmit !== undefined) {
-    updatePayload.allowResubmit = !!payload.allowResubmit;
+    updatePayload.allowResubmit =
+      payload.allowResubmit === true || payload.allowResubmit === "true";
   }
 
   if (payload.isPublished !== undefined) {
-    updatePayload.isPublished = !!payload.isPublished;
+    updatePayload.isPublished =
+      payload.isPublished === true || payload.isPublished === "true";
   }
 
   if (payload.lessonId !== undefined) {
@@ -374,7 +485,12 @@ export const updateAssignment = async (
     }
   );
 
-  if (!assignment) throw new Error("Assignment not found");
+  if (!assignment) {
+    throw new Error("Assignment not found");
+  }
+
+  cleanupRemovedFiles(previousAttachmentUrls, assignment.attachmentUrls || []);
+
   return assignment;
 };
 
@@ -382,13 +498,18 @@ export const deleteAssignment = async (
   assignmentId,
   { requesterId, requesterRole } = {}
 ) => {
-  await ensureAssignmentOwnership(assignmentId, {
+  const assignment = await ensureAssignmentOwnership(assignmentId, {
     requesterId,
     requesterRole,
   });
 
-  const assignment = await Assignment.findById(assignmentId);
-  if (!assignment) throw new Error("Assignment not found");
+  const submissions = await AssignmentSubmission.find({ assignmentId });
+
+  cleanupAllFiles(assignment.attachmentUrls || []);
+
+  for (const submission of submissions) {
+    cleanupAllFiles(submission.fileUrls || []);
+  }
 
   await AssignmentSubmission.deleteMany({ assignmentId });
   await Assignment.findByIdAndDelete(assignmentId);

@@ -1,37 +1,64 @@
 import * as reviewService from "./review.service.js";
+import { sendSuccess, sendError } from "../../utils/response.js";
+
+function getRequester(req) {
+  return {
+    requesterId: req.user?._id || req.user?.userId || req.user?.id || null,
+    requesterRole: req.user?.role || null,
+  };
+}
+
+function getReviewErrorStatus(err) {
+  if (!err?.message) return 400;
+
+  if (
+    err.message === "Course not found" ||
+    err.message === "Review not found"
+  ) {
+    return 404;
+  }
+
+  if (
+    err.message === "You must enroll before reviewing" ||
+    err.message === "Instructor cannot review own course" ||
+    err.message.includes("not allowed")
+  ) {
+    return 403;
+  }
+
+  return 400;
+}
 
 export const getReviewsByCourse = async (req, res) => {
   try {
     const data = await reviewService.getReviewsByCourse(req.params.courseId);
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Get reviews by course successfully",
       data,
     });
   } catch (err) {
-    res.status(400).json({
-      success: false,
-      message: err.message,
+    return sendError(res, {
+      statusCode: getReviewErrorStatus(err),
+      message: err.message || "Failed to get reviews by course",
     });
   }
 };
 
 export const createReview = async (req, res) => {
   try {
-    const requesterId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
 
-    if (requesterRole !== "student" && requesterRole !== "admin") {
-      return res.status(403).json({
-        success: false,
+    if (!["student", "admin"].includes(requesterRole)) {
+      return sendError(res, {
+        statusCode: 403,
         message: "Only student or admin can create review",
       });
     }
@@ -42,38 +69,26 @@ export const createReview = async (req, res) => {
       requesterRole,
     });
 
-    res.status(201).json({
-      success: true,
+    return sendSuccess(res, {
+      statusCode: 201,
       message: "Create review successfully",
       data,
     });
   } catch (err) {
-    const status =
-      err.message === "Course not found"
-        ? 404
-        : err.message === "You must enroll before reviewing"
-        ? 403
-        : err.message === "You already reviewed this course"
-        ? 400
-        : err.message === "Instructor cannot review own course"
-        ? 403
-        : 400;
-
-    res.status(status).json({
-      success: false,
-      message: err.message,
+    return sendError(res, {
+      statusCode: getReviewErrorStatus(err),
+      message: err.message || "Failed to create review",
     });
   }
 };
 
 export const updateReview = async (req, res) => {
   try {
-    const requesterId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
@@ -83,34 +98,25 @@ export const updateReview = async (req, res) => {
       requesterRole,
     });
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Update review successfully",
       data,
     });
   } catch (err) {
-    const status =
-      err.message === "Review not found"
-        ? 404
-        : err.message.includes("not allowed")
-        ? 403
-        : 400;
-
-    res.status(status).json({
-      success: false,
-      message: err.message,
+    return sendError(res, {
+      statusCode: getReviewErrorStatus(err),
+      message: err.message || "Failed to update review",
     });
   }
 };
 
 export const deleteReview = async (req, res) => {
   try {
-    const requesterId = req.user?._id;
-    const requesterRole = req.user?.role;
+    const { requesterId, requesterRole } = getRequester(req);
 
     if (!requesterId) {
-      return res.status(401).json({
-        success: false,
+      return sendError(res, {
+        statusCode: 401,
         message: "Unauthorized",
       });
     }
@@ -120,22 +126,14 @@ export const deleteReview = async (req, res) => {
       requesterRole,
     });
 
-    res.status(200).json({
-      success: true,
+    return sendSuccess(res, {
       message: "Delete review successfully",
       data,
     });
   } catch (err) {
-    const status =
-      err.message === "Review not found"
-        ? 404
-        : err.message.includes("not allowed")
-        ? 403
-        : 400;
-
-    res.status(status).json({
-      success: false,
-      message: err.message,
+    return sendError(res, {
+      statusCode: getReviewErrorStatus(err),
+      message: err.message || "Failed to delete review",
     });
   }
 };

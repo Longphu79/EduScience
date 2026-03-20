@@ -10,12 +10,38 @@ function roundNumber(value = 0) {
   return Math.round(Number(value) || 0);
 }
 
+function escapeRegex(value = "") {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeLevel(value = "beginner") {
+  const allowed = ["beginner", "intermediate", "advanced"];
+  const normalized = String(value || "").toLowerCase().trim();
+  return allowed.includes(normalized) ? normalized : "beginner";
+}
+
+function normalizeString(value = "", fallback = "") {
+  const normalized = String(value || "").trim();
+  return normalized || fallback;
+}
+
+function normalizeSlug(value = "") {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-\s]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 function normalizeSortValue(rawSort) {
   switch (rawSort) {
     case "popular":
       return { totalEnrollments: -1, createdAt: -1 };
     case "rating":
-      return { rating: -1, createdAt: -1 };
+    case "highestRated":
+      return { rating: -1, totalReviews: -1, createdAt: -1 };
     case "priceAsc":
     case "price-low":
       return { price: 1, createdAt: -1 };
@@ -23,9 +49,188 @@ function normalizeSortValue(rawSort) {
     case "price-high":
       return { price: -1, createdAt: -1 };
     case "newest":
-      return { createdAt: -1 };
     default:
       return { createdAt: -1 };
+  }
+}
+
+function normalizePagination(page, limit) {
+  const safePage = Math.max(Number(page) || 1, 1);
+  const safeLimit = Math.min(Math.max(Number(limit) || 9, 1), 50);
+
+  return {
+    page: safePage,
+    limit: safeLimit,
+    skip: (safePage - 1) * safeLimit,
+  };
+}
+
+function normalizeLessonIds(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizePriceValue(value, defaultValue = 0) {
+  const num = Number(value);
+  if (Number.isNaN(num) || num < 0) return defaultValue;
+  return num;
+}
+
+function normalizeCourseCreatePayload(courseData = {}) {
+  const payload = { ...courseData };
+
+  delete payload._id;
+  delete payload.totalEnrollments;
+  delete payload.totalReviews;
+  delete payload.rating;
+  delete payload.analytics;
+  delete payload.createdAt;
+  delete payload.updatedAt;
+
+  payload.title = normalizeString(payload.title);
+  payload.slug = normalizeSlug(payload.slug);
+  payload.shortDescription = normalizeString(payload.shortDescription);
+  payload.description = normalizeString(payload.description);
+  payload.category = normalizeString(payload.category, "General");
+  payload.thumbnail = normalizeString(payload.thumbnail);
+  payload.previewVideo = normalizeString(payload.previewVideo);
+  payload.language = normalizeString(payload.language, "vi");
+  payload.level = normalizeLevel(payload.level);
+
+  payload.duration = Math.max(Number(payload.duration) || 0, 0);
+  payload.price = normalizePriceValue(payload.price, 0);
+
+  if (
+    payload.salePrice === null ||
+    payload.salePrice === undefined ||
+    payload.salePrice === ""
+  ) {
+    payload.salePrice = null;
+  } else {
+    payload.salePrice = normalizePriceValue(payload.salePrice, 0);
+  }
+
+  payload.isFree = payload.isFree === true || Number(payload.price) === 0;
+
+  if (payload.isFree) {
+    payload.price = 0;
+    payload.salePrice = 0;
+  }
+
+  payload.lessonIds = normalizeLessonIds(payload.lessonIds);
+  payload.totalLessons = payload.lessonIds.length;
+
+  return payload;
+}
+
+function normalizeCourseUpdatePayload(updateData = {}) {
+  const payload = { ...updateData };
+
+  delete payload._id;
+  delete payload.instructorId;
+  delete payload.totalEnrollments;
+  delete payload.totalReviews;
+  delete payload.rating;
+  delete payload.analytics;
+  delete payload.createdAt;
+  delete payload.updatedAt;
+
+  const normalized = {};
+
+  if (payload.title !== undefined) {
+    normalized.title = normalizeString(payload.title);
+  }
+
+  if (payload.slug !== undefined) {
+    normalized.slug = normalizeSlug(payload.slug);
+  }
+
+  if (payload.shortDescription !== undefined) {
+    normalized.shortDescription = normalizeString(payload.shortDescription);
+  }
+
+  if (payload.description !== undefined) {
+    normalized.description = normalizeString(payload.description);
+  }
+
+  if (payload.category !== undefined) {
+    normalized.category = normalizeString(payload.category, "General");
+  }
+
+  if (payload.thumbnail !== undefined) {
+    normalized.thumbnail = normalizeString(payload.thumbnail);
+  }
+
+  if (payload.previewVideo !== undefined) {
+    normalized.previewVideo = normalizeString(payload.previewVideo);
+  }
+
+  if (payload.language !== undefined) {
+    normalized.language = normalizeString(payload.language, "vi");
+  }
+
+  if (payload.level !== undefined) {
+    normalized.level = normalizeLevel(payload.level);
+  }
+
+  if (payload.duration !== undefined) {
+    normalized.duration = Math.max(Number(payload.duration) || 0, 0);
+  }
+
+  if (payload.price !== undefined) {
+    normalized.price = normalizePriceValue(payload.price, 0);
+  }
+
+  if (payload.salePrice !== undefined) {
+    if (
+      payload.salePrice === null ||
+      payload.salePrice === "" ||
+      payload.salePrice === undefined
+    ) {
+      normalized.salePrice = null;
+    } else {
+      normalized.salePrice = normalizePriceValue(payload.salePrice, 0);
+    }
+  }
+
+  if (payload.isFree !== undefined || payload.price !== undefined) {
+    const nextIsFree =
+      payload.isFree === true ||
+      (normalized.price !== undefined && Number(normalized.price) === 0);
+
+    normalized.isFree = nextIsFree;
+
+    if (nextIsFree) {
+      normalized.price = 0;
+      normalized.salePrice = 0;
+    }
+  }
+
+  if (payload.lessonIds !== undefined) {
+    normalized.lessonIds = normalizeLessonIds(payload.lessonIds);
+    normalized.totalLessons = normalized.lessonIds.length;
+  }
+
+  if (payload.status !== undefined) {
+    normalized.status = payload.status;
+  }
+
+  if (payload.isPopular !== undefined) {
+    normalized.isPopular = !!payload.isPopular;
+  }
+
+  return normalized;
+}
+
+async function ensureUniqueSlug(slug, excludeCourseId = null) {
+  if (!slug) return;
+
+  const existingCourse = await Course.findOne({
+    slug,
+    ...(excludeCourseId ? { _id: { $ne: excludeCourseId } } : {}),
+  });
+
+  if (existingCourse) {
+    throw new Error("Slug already exists");
   }
 }
 
@@ -161,7 +366,7 @@ async function buildInstructorCourseAnalytics(courses = []) {
 }
 
 export const getPopularCourses = async () => {
-  return await Course.find({
+  return Course.find({
     isPopular: true,
     status: "published",
   })
@@ -176,33 +381,31 @@ export const getPopularCourses = async () => {
 };
 
 export const createCourse = async (courseData) => {
-  const payload = { ...courseData };
+  const payload = normalizeCourseCreatePayload(courseData);
 
   if (!payload.instructorId) {
     throw new Error("Instructor ID is required");
   }
 
-  delete payload._id;
-  delete payload.totalEnrollments;
-  delete payload.totalReviews;
-  delete payload.rating;
-
-  if (payload.isFree) {
-    payload.price = 0;
-    payload.salePrice = 0;
+  if (!payload.title) {
+    throw new Error("Title is required");
   }
 
-  if (!Array.isArray(payload.lessonIds)) {
-    payload.lessonIds = [];
+  if (!payload.slug) {
+    throw new Error("Slug is required");
   }
 
-  payload.totalLessons = payload.lessonIds.length;
+  if (!payload.shortDescription) {
+    throw new Error("Short description is required");
+  }
 
-  return await Course.create(payload);
+  await ensureUniqueSlug(payload.slug);
+
+  return Course.create(payload);
 };
 
 export const getCourseById = async (courseId) => {
-  return await Course.findById(courseId)
+  return Course.findById(courseId)
     .populate("instructorId")
     .populate({
       path: "lessonIds",
@@ -212,7 +415,7 @@ export const getCourseById = async (courseId) => {
 };
 
 export const getCourseBySlug = async (slug) => {
-  return await Course.findOne({
+  return Course.findOne({
     slug,
     status: "published",
   })
@@ -225,31 +428,96 @@ export const getCourseBySlug = async (slug) => {
 };
 
 export const getAllCourses = async (query = {}) => {
+  const {
+    search = "",
+    category,
+    level,
+    pricing,
+    instructorId,
+    minRating,
+    sortBy,
+    sort,
+    page,
+    limit,
+    status,
+  } = query;
+
   const filter = {
-    status: query.status || "published",
+    status: status || "published",
   };
 
-  if (query.search) {
+  if (search?.trim()) {
+    const keyword = escapeRegex(search.trim());
     filter.$or = [
-      { title: { $regex: query.search, $options: "i" } },
-      { category: { $regex: query.search, $options: "i" } },
-      { level: { $regex: query.search, $options: "i" } },
+      { title: { $regex: keyword, $options: "i" } },
+      { shortDescription: { $regex: keyword, $options: "i" } },
+      { description: { $regex: keyword, $options: "i" } },
+      { category: { $regex: keyword, $options: "i" } },
+      { level: { $regex: keyword, $options: "i" } },
     ];
   }
 
-  if (query.category && query.category !== "All") {
-    filter.category = { $regex: `^${query.category}$`, $options: "i" };
+  if (category && category !== "All") {
+    filter.category = { $regex: `^${escapeRegex(category)}$`, $options: "i" };
   }
 
-  if (query.level && query.level !== "All") {
-    filter.level = String(query.level).toLowerCase();
+  if (level && level !== "All") {
+    filter.level = String(level).toLowerCase();
   }
 
-  const sort = normalizeSortValue(query.sortBy || query.sort);
+  if (pricing === "free") {
+    filter.isFree = true;
+  }
 
-  return await Course.find(filter)
-    .populate("instructorId")
-    .sort(sort);
+  if (pricing === "paid") {
+    filter.isFree = false;
+  }
+
+  if (instructorId) {
+    filter.instructorId = instructorId;
+  }
+
+  if (minRating !== undefined && minRating !== null && minRating !== "") {
+    filter.rating = { $gte: Number(minRating) || 0 };
+  }
+
+  const sortConfig = normalizeSortValue(sortBy || sort);
+  const { page: safePage, limit: safeLimit, skip } = normalizePagination(
+    page,
+    limit
+  );
+
+  const [items, totalItems] = await Promise.all([
+    Course.find(filter)
+      .populate("instructorId")
+      .sort(sortConfig)
+      .skip(skip)
+      .limit(safeLimit),
+    Course.countDocuments(filter),
+  ]);
+
+  const totalPages = Math.max(Math.ceil(totalItems / safeLimit), 1);
+
+  return {
+    items,
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      totalItems,
+      totalPages,
+      hasNextPage: safePage < totalPages,
+      hasPrevPage: safePage > 1,
+    },
+    filters: {
+      search,
+      category: category || "All",
+      level: level || "All",
+      pricing: pricing || "all",
+      instructorId: instructorId || "",
+      minRating: minRating ?? "",
+      sortBy: sortBy || sort || "newest",
+    },
+  };
 };
 
 export const getCoursesByInstructor = async (instructorId) => {
@@ -262,11 +530,11 @@ export const getCoursesByInstructor = async (instructorId) => {
     .sort({ createdAt: -1 })
     .lean();
 
-  return await buildInstructorCourseAnalytics(courses);
+  return buildInstructorCourseAnalytics(courses);
 };
 
 export const getCourseLearningDetail = async (courseId) => {
-  return await Course.findById(courseId)
+  return Course.findById(courseId)
     .populate("instructorId")
     .populate({
       path: "lessonIds",
@@ -293,21 +561,10 @@ export const updateCourse = async (
     throw new Error("You are not allowed to update this course");
   }
 
-  const payload = { ...updateData };
+  const payload = normalizeCourseUpdatePayload(updateData);
 
-  delete payload.instructorId;
-  delete payload._id;
-  delete payload.totalEnrollments;
-  delete payload.totalReviews;
-  delete payload.rating;
-
-  if (payload.isFree) {
-    payload.price = 0;
-    payload.salePrice = 0;
-  }
-
-  if (Array.isArray(payload.lessonIds)) {
-    payload.totalLessons = payload.lessonIds.length;
+  if (payload.slug) {
+    await ensureUniqueSlug(payload.slug, courseId);
   }
 
   const updatedCourse = await Course.findByIdAndUpdate(courseId, payload, {
@@ -340,5 +597,11 @@ export const deleteCourse = async (
     throw new Error("You are not allowed to delete this course");
   }
 
-  return await Course.findByIdAndDelete(courseId);
+  const enrollmentCount = await Enrollment.countDocuments({ courseId });
+
+  if (enrollmentCount > 0) {
+    throw new Error("Cannot delete course that already has enrollments");
+  }
+
+  return Course.findByIdAndDelete(courseId);
 };
