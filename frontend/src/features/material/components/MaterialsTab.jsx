@@ -1,47 +1,39 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getMaterialsByCourse } from "../services/material.service";
+import MaterialList from "./MaterialList";
+import { normalizeMaterialList } from "../utils/material.helpers";
 
 export default function MaterialsTab({ courseId }) {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchMaterials = async () => {
-      try {
-        setLoading(true);
-        const response = await getMaterialsByCourse(courseId);
-        const data = response?.data?.data || response?.data || response || [];
-        setMaterials(Array.isArray(data) ? data : []);
-      } catch {
-        setMaterials([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (courseId) fetchMaterials();
+  const loadMaterials = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await getMaterialsByCourse(courseId);
+      setMaterials(normalizeMaterialList(response));
+    } catch {
+      setMaterials([]);
+    } finally {
+      setLoading(false);
+    }
   }, [courseId]);
 
-  if (loading) return <p>Đang tải tài liệu...</p>;
+  useEffect(() => {
+    if (courseId) {
+      loadMaterials();
+    }
+  }, [courseId, loadMaterials]);
 
-  if (!materials.length) {
-    return <p className="text-slate-600">Chưa có tài liệu nào.</p>;
+  if (loading) {
+    return <p className="text-slate-600">Đang tải tài liệu...</p>;
   }
 
   return (
-    <div className="space-y-3">
-      {materials.map((item) => (
-        <a
-          key={item._id}
-          href={item.fileUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="block rounded-xl border border-slate-200 p-4 hover:bg-slate-50"
-        >
-          <p className="font-medium text-slate-900">{item.title}</p>
-          <p className="text-sm text-slate-600">{item.description}</p>
-        </a>
-      ))}
-    </div>
+    <MaterialList
+      materials={materials}
+      emptyTitle="Chưa có tài liệu nào"
+      emptyDescription="Khóa học này hiện chưa có tài liệu."
+    />
   );
 }

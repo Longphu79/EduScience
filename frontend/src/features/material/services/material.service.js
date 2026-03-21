@@ -1,7 +1,8 @@
-const API_BASE_URL =
+const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  "http://localhost:4000";
+  "http://localhost:4000"
+).replace(/\/$/, "");
 
 function getAuthToken() {
   try {
@@ -49,8 +50,14 @@ function createHeaders(extraHeaders = {}, useAuth = false) {
   return headers;
 }
 
+async function parseJsonSafe(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) return null;
+  return response.json().catch(() => null);
+}
+
 async function handleResponse(response, fallbackMessage = "Request failed") {
-  const data = await response.json().catch(() => null);
+  const data = await parseJsonSafe(response);
 
   if (!response.ok) {
     throw new Error(data?.message || fallbackMessage);
@@ -59,54 +66,84 @@ async function handleResponse(response, fallbackMessage = "Request failed") {
   return data;
 }
 
-export function materialUnwrap(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (payload?.data && typeof payload.data === "object") return payload.data;
-  return payload;
+async function apiRequest(
+  path,
+  options = {},
+  fallbackMessage = "Request failed"
+) {
+  const response = await fetch(`${API_BASE_URL}${path}`, options);
+  return handleResponse(response, fallbackMessage);
 }
 
 export async function getMaterialsByCourse(courseId) {
-  const response = await fetch(`${API_BASE_URL}/material/course/${courseId}`, {
-    headers: createHeaders({}, true),
-  });
-  return handleResponse(response, "Failed to fetch materials");
+  if (!courseId) {
+    throw new Error("courseId is required");
+  }
+
+  return apiRequest(
+    `/material/course/${courseId}`,
+    {
+      headers: createHeaders({}, true),
+    },
+    "Failed to fetch materials"
+  );
 }
 
 export async function getMaterialsByLesson(lessonId) {
-  const response = await fetch(`${API_BASE_URL}/material/lesson/${lessonId}`, {
-    headers: createHeaders({}, true),
-  });
-  return handleResponse(response, "Failed to fetch lesson materials");
+  if (!lessonId) {
+    throw new Error("lessonId is required");
+  }
+
+  return apiRequest(
+    `/material/lesson/${lessonId}`,
+    {
+      headers: createHeaders({}, true),
+    },
+    "Failed to fetch lesson materials"
+  );
 }
 
 export async function createMaterial(payload) {
-  const response = await fetch(`${API_BASE_URL}/material`, {
-    method: "POST",
-    headers: createHeaders({ "Content-Type": "application/json" }, true),
-    body: JSON.stringify(payload),
-  });
-
-  return handleResponse(response, "Failed to create material");
+  return apiRequest(
+    "/material",
+    {
+      method: "POST",
+      headers: createHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify(payload),
+    },
+    "Failed to create material"
+  );
 }
 
 export async function updateMaterial(materialId, payload) {
-  const response = await fetch(`${API_BASE_URL}/material/${materialId}`, {
-    method: "PUT",
-    headers: createHeaders({ "Content-Type": "application/json" }, true),
-    body: JSON.stringify(payload),
-  });
+  if (!materialId) {
+    throw new Error("materialId is required");
+  }
 
-  return handleResponse(response, "Failed to update material");
+  return apiRequest(
+    `/material/${materialId}`,
+    {
+      method: "PUT",
+      headers: createHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify(payload),
+    },
+    "Failed to update material"
+  );
 }
 
 export async function deleteMaterial(materialId) {
-  const response = await fetch(`${API_BASE_URL}/material/${materialId}`, {
-    method: "DELETE",
-    headers: createHeaders({}, true),
-  });
+  if (!materialId) {
+    throw new Error("materialId is required");
+  }
 
-  return handleResponse(response, "Failed to delete material");
+  return apiRequest(
+    `/material/${materialId}`,
+    {
+      method: "DELETE",
+      headers: createHeaders({}, true),
+    },
+    "Failed to delete material"
+  );
 }
 
 export const getCourseMaterials = getMaterialsByCourse;

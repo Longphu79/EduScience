@@ -1,74 +1,158 @@
-import React, { useState } from "react";
+import Button from "../../../shared/components/Button";
+import AttachmentList from "./AttachmentList";
+import "../styles/assignment-components.css";
 
-export default function AssignmentForm({ onSubmit, initialData = null }) {
-  const [title, setTitle] = useState(initialData?.title || "");
-  const [description, setDescription] = useState(initialData?.description || "");
-  const [dueDate, setDueDate] = useState(initialData?.dueDate || "");
-  const [maxScore, setMaxScore] = useState(initialData?.maxScore || 100);
-  const [allowResubmit, setAllowResubmit] = useState(
-    initialData?.allowResubmit ?? true
-  );
-  const [attachmentUrls, setAttachmentUrls] = useState(
-    (initialData?.attachmentUrls || []).join(", ")
-  );
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit({
-      title,
-      description,
-      dueDate: dueDate || null,
-      maxScore: Number(maxScore),
-      allowResubmit,
-      attachmentUrls: attachmentUrls
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    });
-  };
-
+export default function AssignmentForm({
+  form,
+  editingId,
+  saving,
+  keptAttachmentUrls = [],
+  selectedAttachmentFiles = [],
+  onChange,
+  onSubmit,
+  onReset,
+  onRemoveKeptAttachment,
+  onAddFiles,
+  onRemoveSelectedFile,
+}) {
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        placeholder="Assignment title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <br />
-      <textarea
-        placeholder="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-      <br />
-      <input
-        type="datetime-local"
-        value={dueDate}
-        onChange={(e) => setDueDate(e.target.value)}
-      />
-      <br />
-      <input
-        type="number"
-        value={maxScore}
-        onChange={(e) => setMaxScore(e.target.value)}
-      />
-      <br />
-      <label>
-        <input
-          type="checkbox"
-          checked={allowResubmit}
-          onChange={(e) => setAllowResubmit(e.target.checked)}
-        />
-        Allow resubmit
-      </label>
-      <br />
-      <textarea
-        placeholder="Attachment URLs separated by comma"
-        value={attachmentUrls}
-        onChange={(e) => setAttachmentUrls(e.target.value)}
-      />
-      <br />
-      <button type="submit">Save Assignment</button>
+    <form onSubmit={onSubmit} className="assignment-form assignment-form--card">
+      <div className="assignment-form__topbar">
+        <div>
+          <div className="assignment-form__eyebrow">Assignment Form</div>
+          <h2 className="assignment-form__title">
+            {editingId ? "Edit Assignment" : "Create Assignment"}
+          </h2>
+        </div>
+
+        {editingId ? (
+          <button
+            type="button"
+            onClick={onReset}
+            className="assignment-form__cancel-pill"
+          >
+            Cancel edit
+          </button>
+        ) : null}
+      </div>
+
+      <div className="assignment-form__grid">
+        <div className="assignment-form__field">
+          <label className="assignment-form__label">Assignment title</label>
+          <input
+            type="text"
+            className="assignment-form__input"
+            placeholder="Nhập tiêu đề bài tập"
+            value={form.title}
+            onChange={(event) => onChange("title", event.target.value)}
+          />
+        </div>
+
+        <div className="assignment-form__field">
+          <label className="assignment-form__label">Description</label>
+          <textarea
+            rows={5}
+            className="assignment-form__textarea"
+            placeholder="Nhập mô tả bài tập"
+            value={form.description}
+            onChange={(event) => onChange("description", event.target.value)}
+          />
+        </div>
+
+        <div className="assignment-form__row assignment-form__row--two">
+          <div className="assignment-form__field">
+            <label className="assignment-form__label">Due date</label>
+            <input
+              type="datetime-local"
+              className="assignment-form__input"
+              value={form.dueDate}
+              onChange={(event) => onChange("dueDate", event.target.value)}
+            />
+          </div>
+
+          <div className="assignment-form__field">
+            <label className="assignment-form__label">Max score</label>
+            <input
+              type="number"
+              min="0"
+              className="assignment-form__input"
+              value={form.maxScore}
+              onChange={(event) => onChange("maxScore", event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="assignment-form__checkbox-group">
+          <label className="assignment-form__checkbox-item">
+            <input
+              type="checkbox"
+              checked={form.allowResubmit}
+              onChange={(event) =>
+                onChange("allowResubmit", event.target.checked)
+              }
+            />
+            <span>Allow resubmit</span>
+          </label>
+
+          <label className="assignment-form__checkbox-item">
+            <input
+              type="checkbox"
+              checked={form.isPublished}
+              onChange={(event) => onChange("isPublished", event.target.checked)}
+            />
+            <span>Published</span>
+          </label>
+        </div>
+
+        {editingId && keptAttachmentUrls.length > 0 ? (
+          <div className="assignment-form__field">
+            <label className="assignment-form__label">Current attachments</label>
+            <AttachmentList
+              items={keptAttachmentUrls}
+              removable
+              onRemove={onRemoveKeptAttachment}
+              fallbackPrefix="Attachment"
+            />
+          </div>
+        ) : null}
+
+        <div className="assignment-form__field">
+          <label className="assignment-form__label">Upload attachment files</label>
+          <input
+            type="file"
+            multiple
+            onChange={(event) => onAddFiles(Array.from(event.target.files || []))}
+            className="assignment-form__file-input"
+          />
+
+          {selectedAttachmentFiles.length > 0 ? (
+            <div className="assignment-form__file-list">
+              <AttachmentList
+                items={selectedAttachmentFiles}
+                removable
+                onRemove={(_, index) => onRemoveSelectedFile(index)}
+              />
+            </div>
+          ) : null}
+
+          <p className="assignment-form__hint">
+            Chỉ dùng upload file thật. Khi sửa assignment, bạn có thể xóa từng
+            file cũ hoặc thêm file mới.
+          </p>
+        </div>
+      </div>
+
+      <div className="assignment-form__actions">
+        <Button type="submit" loading={saving}>
+          {editingId ? "Update Assignment" : "Save Assignment"}
+        </Button>
+
+        {editingId ? (
+          <Button type="button" onClick={onReset}>
+            Reset
+          </Button>
+        ) : null}
+      </div>
     </form>
   );
 }

@@ -1,0 +1,10 @@
+.course-materials-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 24px 16px;
+}
+
+.course-materials-page__container {
+  max-width: 72rem;
+  margin: 0 auto;
+}

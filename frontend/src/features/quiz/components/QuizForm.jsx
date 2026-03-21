@@ -1,29 +1,11 @@
-import React from "react";
+import React, { useCallback } from "react";
 import Button from "../../../shared/components/Button";
-
-const createDefaultOptions = (type = "single") => {
-  if (type === "true-false") {
-    return [
-      { text: "True", isCorrect: true },
-      { text: "False", isCorrect: false },
-    ];
-  }
-
-  return [
-    { text: "", isCorrect: true },
-    { text: "", isCorrect: false },
-    { text: "", isCorrect: false },
-    { text: "", isCorrect: false },
-  ];
-};
-
-const createEmptyQuestion = () => ({
-  questionText: "",
-  type: "single",
-  explanation: "",
-  points: 1,
-  options: createDefaultOptions("single"),
-});
+import {
+  createEmptyQuestion,
+  createQuizOption,
+  normalizeQuestionTypeOptions,
+} from "../utils/quiz.form.helpers";
+import QuizQuestionEditor from "./QuizQuestionEditor";
 
 export default function QuizForm({
   form,
@@ -32,387 +14,282 @@ export default function QuizForm({
   saving = false,
   submitLabel = "Save Quiz",
 }) {
-  function updateQuestion(index, key, value) {
-    setForm((prev) => {
-      const questions = [...(prev.questions || [])];
-      questions[index] = { ...questions[index], [key]: value };
+  const updateRootField = useCallback(
+    (field, value) => {
+      setForm((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    },
+    [setForm]
+  );
 
-      if (key === "type") {
-        if (value === "true-false") {
-          questions[index].options = createDefaultOptions("true-false");
-        } else if ((questions[index].options || []).length < 2) {
-          questions[index].options = createDefaultOptions(value);
-        } else if (value === "single") {
-          const firstCorrectIndex = questions[index].options.findIndex(
-            (opt) => opt.isCorrect
-          );
+  const updateQuestion = useCallback(
+    (questionIndex, field, value) => {
+      setForm((prev) => {
+        const nextQuestions = [...prev.questions];
+        const currentQuestion = nextQuestions[questionIndex];
 
-          questions[index].options = questions[index].options.map(
-            (opt, optIdx) => ({
-              ...opt,
-              isCorrect:
-                firstCorrectIndex === -1
-                  ? optIdx === 0
-                  : optIdx === firstCorrectIndex,
-            })
+        if (!currentQuestion) return prev;
+
+        if (field === "type") {
+          nextQuestions[questionIndex] = normalizeQuestionTypeOptions(
+            currentQuestion,
+            value
           );
+        } else {
+          nextQuestions[questionIndex] = {
+            ...currentQuestion,
+            [field]: field === "points" ? Number(value) || 1 : value,
+          };
         }
-      }
 
-      return { ...prev, questions };
-    });
-  }
+        return {
+          ...prev,
+          questions: nextQuestions,
+        };
+      });
+    },
+    [setForm]
+  );
 
-  function updateOption(questionIndex, optionIndex, key, value) {
-    setForm((prev) => {
-      const questions = [...(prev.questions || [])];
-      const options = [...(questions[questionIndex].options || [])];
+  const updateOption = useCallback(
+    (questionIndex, optionIndex, field, value) => {
+      setForm((prev) => {
+        const nextQuestions = [...prev.questions];
+        const currentQuestion = nextQuestions[questionIndex];
+        if (!currentQuestion) return prev;
 
-      options[optionIndex] = { ...options[optionIndex], [key]: value };
-      questions[questionIndex] = { ...questions[questionIndex], options };
+        const nextOptions = [...(currentQuestion.options || [])];
+        const currentOption = nextOptions[optionIndex];
+        if (!currentOption) return prev;
 
-      return { ...prev, questions };
-    });
-  }
-
-  function toggleCorrectOption(questionIndex, optionIndex) {
-    setForm((prev) => {
-      const questions = [...(prev.questions || [])];
-      const question = questions[questionIndex];
-      const type = question.type || "single";
-
-      let options = [...(question.options || [])];
-
-      if (type === "multiple") {
-        options[optionIndex] = {
-          ...options[optionIndex],
-          isCorrect: !options[optionIndex].isCorrect,
+        nextOptions[optionIndex] = {
+          ...currentOption,
+          [field]: value,
         };
 
-        if (!options.some((opt) => opt.isCorrect)) {
-          options[optionIndex].isCorrect = true;
+        nextQuestions[questionIndex] = {
+          ...currentQuestion,
+          options: nextOptions,
+        };
+
+        return {
+          ...prev,
+          questions: nextQuestions,
+        };
+      });
+    },
+    [setForm]
+  );
+
+  const toggleCorrectOption = useCallback(
+    (questionIndex, optionIndex) => {
+      setForm((prev) => {
+        const nextQuestions = [...prev.questions];
+        const currentQuestion = nextQuestions[questionIndex];
+        if (!currentQuestion) return prev;
+
+        const questionType = currentQuestion.type || "single";
+        const nextOptions = [...(currentQuestion.options || [])];
+
+        if (questionType === "multiple") {
+          nextOptions[optionIndex] = {
+            ...nextOptions[optionIndex],
+            isCorrect: !nextOptions[optionIndex]?.isCorrect,
+          };
+        } else {
+          for (let i = 0; i < nextOptions.length; i += 1) {
+            nextOptions[i] = {
+              ...nextOptions[i],
+              isCorrect: i === optionIndex,
+            };
+          }
         }
-      } else {
-        options = options.map((option, idx) => ({
-          ...option,
-          isCorrect: idx === optionIndex,
-        }));
-      }
 
-      questions[questionIndex] = { ...question, options };
-      return { ...prev, questions };
-    });
-  }
+        nextQuestions[questionIndex] = {
+          ...currentQuestion,
+          options: nextOptions,
+        };
 
-  function addQuestion() {
+        return {
+          ...prev,
+          questions: nextQuestions,
+        };
+      });
+    },
+    [setForm]
+  );
+
+  const addOption = useCallback(
+    (questionIndex) => {
+      setForm((prev) => {
+        const nextQuestions = [...prev.questions];
+        const currentQuestion = nextQuestions[questionIndex];
+        if (!currentQuestion) return prev;
+
+        nextQuestions[questionIndex] = {
+          ...currentQuestion,
+          options: [...(currentQuestion.options || []), createQuizOption("", false)],
+        };
+
+        return {
+          ...prev,
+          questions: nextQuestions,
+        };
+      });
+    },
+    [setForm]
+  );
+
+  const removeOption = useCallback(
+    (questionIndex, optionIndex) => {
+      setForm((prev) => {
+        const nextQuestions = [...prev.questions];
+        const currentQuestion = nextQuestions[questionIndex];
+        if (!currentQuestion) return prev;
+
+        const options = [...(currentQuestion.options || [])];
+        if (options.length <= 2) return prev;
+
+        options.splice(optionIndex, 1);
+
+        nextQuestions[questionIndex] = {
+          ...currentQuestion,
+          options,
+        };
+
+        return {
+          ...prev,
+          questions: nextQuestions,
+        };
+      });
+    },
+    [setForm]
+  );
+
+  const addQuestion = useCallback(() => {
     setForm((prev) => ({
       ...prev,
-      questions: [...(prev.questions || []), createEmptyQuestion()],
+      questions: [...prev.questions, createEmptyQuestion()],
     }));
-  }
+  }, [setForm]);
 
-  function removeQuestion(index) {
-    setForm((prev) => ({
-      ...prev,
-      questions: (prev.questions || []).filter((_, i) => i !== index),
-    }));
-  }
+  const removeQuestion = useCallback(
+    (questionIndex) => {
+      setForm((prev) => {
+        if ((prev.questions || []).length <= 1) return prev;
 
-  function addOption(questionIndex) {
-    setForm((prev) => {
-      const questions = [...(prev.questions || [])];
-      const question = questions[questionIndex];
+        const nextQuestions = [...prev.questions];
+        nextQuestions.splice(questionIndex, 1);
 
-      if (question.type === "true-false") return prev;
-
-      questions[questionIndex] = {
-        ...question,
-        options: [...(question.options || []), { text: "", isCorrect: false }],
-      };
-
-      return { ...prev, questions };
-    });
-  }
-
-  function removeOption(questionIndex, optionIndex) {
-    setForm((prev) => {
-      const questions = [...(prev.questions || [])];
-      const question = questions[questionIndex];
-
-      if (question.type === "true-false") return prev;
-      if ((question.options || []).length <= 2) return prev;
-
-      let nextOptions = (question.options || []).filter(
-        (_, idx) => idx !== optionIndex
-      );
-
-      if (
-        question.type !== "multiple" &&
-        !nextOptions.some((opt) => opt.isCorrect) &&
-        nextOptions.length > 0
-      ) {
-        nextOptions = nextOptions.map((opt, idx) => ({
-          ...opt,
-          isCorrect: idx === 0,
-        }));
-      }
-
-      questions[questionIndex] = {
-        ...question,
-        options: nextOptions,
-      };
-
-      return { ...prev, questions };
-    });
-  }
+        return {
+          ...prev,
+          questions: nextQuestions,
+        };
+      });
+    },
+    [setForm]
+  );
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      <div className="rounded-2xl border bg-white p-6 shadow-sm space-y-5">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Quiz title
-          </label>
-          <input
-            type="text"
-            className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-            value={form.title || ""}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, title: e.target.value }))
-            }
-            placeholder="Nhập tiêu đề quiz"
-          />
-        </div>
+      <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Quiz title
+            </label>
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => updateRootField("title", e.target.value)}
+              className="w-full rounded-[20px] border border-slate-300 px-4 py-3 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+              placeholder="Nhập tiêu đề quiz"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Description
-          </label>
-          <textarea
-            rows={4}
-            className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-            value={form.description || ""}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, description: e.target.value }))
-            }
-            placeholder="Nhập mô tả quiz"
-          />
-        </div>
+          <div className="md:col-span-2">
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Description
+            </label>
+            <textarea
+              rows={4}
+              value={form.description}
+              onChange={(e) => updateRootField("description", e.target.value)}
+              className="w-full rounded-[20px] border border-slate-300 px-4 py-3 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+              placeholder="Mô tả quiz"
+            />
+          </div>
 
-        <div className="grid md:grid-cols-3 gap-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="mb-2 block text-sm font-medium text-slate-700">
               Passing score
             </label>
             <input
               type="number"
               min="0"
-              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-              value={form.passingScore ?? 0}
+              value={form.passingScore}
               onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  passingScore: e.target.value,
-                }))
+                updateRootField("passingScore", Number(e.target.value) || 0)
               }
+              className="w-full rounded-[20px] border border-slate-300 px-4 py-3 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="mb-2 block text-sm font-medium text-slate-700">
               Time limit (minutes)
             </label>
             <input
               type="number"
               min="0"
-              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-              value={form.timeLimit ?? 0}
+              value={form.timeLimit}
               onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  timeLimit: e.target.value,
-                }))
+                updateRootField("timeLimit", Number(e.target.value) || 0)
               }
+              className="w-full rounded-[20px] border border-slate-300 px-4 py-3 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
             />
-          </div>
-
-          <div className="flex items-center gap-3 pt-8">
-            <input
-              id="quiz-published"
-              type="checkbox"
-              checked={!!form.isPublished}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  isPublished: e.target.checked,
-                }))
-              }
-            />
-            <label htmlFor="quiz-published" className="text-sm text-gray-700">
-              Published
-            </label>
           </div>
         </div>
+
+        <label className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+          <input
+            type="checkbox"
+            checked={!!form.isPublished}
+            onChange={(e) => updateRootField("isPublished", e.target.checked)}
+          />
+          Publish quiz immediately
+        </label>
       </div>
 
-      <div className="space-y-4">
-        {(form.questions || []).map((question, questionIndex) => {
-          const questionType = question.type || "single";
+      <div className="space-y-5">
+        {(form.questions || []).map((question, questionIndex) => (
+          <QuizQuestionEditor
+            key={question?.clientId || questionIndex}
+            question={question}
+            questionIndex={questionIndex}
+            totalQuestions={form.questions.length}
+            onRemoveQuestion={removeQuestion}
+            onUpdateQuestion={updateQuestion}
+            onUpdateOption={updateOption}
+            onToggleCorrectOption={toggleCorrectOption}
+            onAddOption={addOption}
+            onRemoveOption={removeOption}
+          />
+        ))}
 
-          return (
-            <div
-              key={question._id || questionIndex}
-              className="rounded-2xl border bg-white p-6 shadow-sm space-y-4"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Question {questionIndex + 1}
-                </h2>
-
-                {(form.questions || []).length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => removeQuestion(questionIndex)}
-                    className="text-sm text-red-600 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Question text
-                </label>
-                <input
-                  type="text"
-                  className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-                  value={question.questionText || ""}
-                  onChange={(e) =>
-                    updateQuestion(questionIndex, "questionText", e.target.value)
-                  }
-                  placeholder="Nhập nội dung câu hỏi"
-                />
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-5">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Type
-                  </label>
-                  <select
-                    value={questionType}
-                    onChange={(e) =>
-                      updateQuestion(questionIndex, "type", e.target.value)
-                    }
-                    className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-                  >
-                    <option value="single">Single choice</option>
-                    <option value="multiple">Multiple choice</option>
-                    <option value="true-false">True / False</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Points
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-                    value={question.points ?? 1}
-                    onChange={(e) =>
-                      updateQuestion(questionIndex, "points", e.target.value)
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-700">
-                  Options
-                </label>
-
-                {(question.options || []).map((option, optionIndex) => (
-                  <div
-                    key={optionIndex}
-                    className="flex items-center gap-3 rounded-xl border p-3"
-                  >
-                    <input
-                      type={questionType === "multiple" ? "checkbox" : "radio"}
-                      name={`correct-answer-${questionIndex}`}
-                      checked={!!option.isCorrect}
-                      onChange={() =>
-                        toggleCorrectOption(questionIndex, optionIndex)
-                      }
-                    />
-
-                    <input
-                      type="text"
-                      className="flex-1 rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-400"
-                      value={option.text || ""}
-                      onChange={(e) =>
-                        updateOption(
-                          questionIndex,
-                          optionIndex,
-                          "text",
-                          e.target.value
-                        )
-                      }
-                      disabled={questionType === "true-false"}
-                      placeholder={`Option ${optionIndex + 1}`}
-                    />
-
-                    {questionType !== "true-false" &&
-                    (question.options || []).length > 2 ? (
-                      <button
-                        type="button"
-                        onClick={() => removeOption(questionIndex, optionIndex)}
-                        className="text-sm text-red-600"
-                      >
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-
-                {questionType !== "true-false" ? (
-                  <button
-                    type="button"
-                    onClick={() => addOption(questionIndex)}
-                    className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-                  >
-                    + Add option
-                  </button>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Explanation
-                </label>
-                <textarea
-                  rows={3}
-                  className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-indigo-400"
-                  value={question.explanation || ""}
-                  onChange={(e) =>
-                    updateQuestion(questionIndex, "explanation", e.target.value)
-                  }
-                  placeholder="Giải thích đáp án đúng"
-                />
-              </div>
-            </div>
-          );
-        })}
+        <button
+          type="button"
+          onClick={addQuestion}
+          className="inline-flex items-center rounded-full bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+        >
+          + Add question
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Button type="button" onClick={addQuestion}>
-          + Add Question
-        </Button>
-
-        <Button type="submit" loading={saving} disabled={saving}>
+        <Button type="submit" disabled={saving} loading={saving}>
           {submitLabel}
         </Button>
       </div>

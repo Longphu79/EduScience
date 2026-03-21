@@ -1,115 +1,92 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import ChatBox from "../components/ChatBox";
 import ConversationList from "../components/ConversationList";
-import {
-  chatUnwrap,
-  getInstructorCourseConversations,
-} from "../services/chat.service";
-import { useAuth } from "../../auth/state/useAuth";
+import useCourseChatPage from "../hooks/useCourseChatPage";
+import "../styles/chat-page.css";
 
 export default function CourseChatPage() {
-  const { courseId } = useParams();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const {
+    courseId,
+    currentUserId,
+    isInstructor,
+    isChatAllowed,
+    conversations,
+    loadingList,
+    activeConversation,
+    openingConversationId,
+    handleSelectInstructorConversation,
+    openStudentChatDock,
+  } = useCourseChatPage();
 
-  const currentRole = user?.role || null;
-  const currentUserId = user?._id || user?.id || user?.userId || null;
-
-  const [conversations, setConversations] = useState([]);
-  const [loadingList, setLoadingList] = useState(false);
-
-  const targetStudentId = useMemo(() => {
-    const value = searchParams.get("studentId");
-    return value || null;
-  }, [searchParams]);
-
-  useEffect(() => {
-    async function loadConversations() {
-      if (currentRole !== "instructor" || !courseId) return;
-
-      try {
-        setLoadingList(true);
-        const response = await getInstructorCourseConversations(courseId);
-        const data = chatUnwrap(response);
-        setConversations(Array.isArray(data) ? data : []);
-      } catch (error) {
-        setConversations([]);
-      } finally {
-        setLoadingList(false);
-      }
-    }
-
-    loadConversations();
-  }, [courseId, currentRole]);
-
-  const activeConversation = useMemo(() => {
-    if (!Array.isArray(conversations) || !targetStudentId) return null;
-
+  if (!isChatAllowed) {
     return (
-      conversations.find((item) => {
-        const studentId =
-          item?.studentId?._id || item?.studentId?.id || item?.studentId;
-        return String(studentId) === String(targetStudentId);
-      }) || null
+      <div className="course-chat-page">
+        <div className="course-chat-page__card">
+          <div className="course-chat-page__hero">
+            <h1 className="course-chat-page__title">Tin nhắn khóa học</h1>
+            <p className="course-chat-page__subtitle">
+              Tài khoản admin không được sử dụng chức năng chat.
+            </p>
+          </div>
+        </div>
+      </div>
     );
-  }, [conversations, targetStudentId]);
+  }
 
-  if (currentRole === "instructor") {
+  if (isInstructor) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900">Tin nhắn khóa học</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Chọn học viên để trò chuyện realtime.
+      <div className="course-chat-page">
+        <div className="course-chat-page__hero">
+          <h1 className="course-chat-page__title">Tin nhắn khóa học</h1>
+          <p className="course-chat-page__subtitle">
+            Chọn học viên để mở hộp chat realtime ở góc dưới màn hình.
           </p>
         </div>
 
-        <div className="grid min-h-[720px] gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <aside>
-            <ConversationList
-              conversations={conversations}
-              loading={loadingList}
-              currentUserId={currentUserId}
-              activeConversationId={activeConversation?._id || null}
-              emptyText="Khóa học này chưa có cuộc trò chuyện nào."
-              onSelect={(conversation) => {
-                const studentId =
-                  conversation?.studentId?._id ||
-                  conversation?.studentId?.id ||
-                  conversation?.studentId;
-
-                navigate(
-                  `/instructor/courses/${courseId}/chat?studentId=${studentId}`
-                );
-              }}
-            />
-          </aside>
-
-          <main className="min-h-0">
-            <ChatBox
-              courseId={courseId}
-              targetStudentId={targetStudentId}
-              conversationId={activeConversation?._id || null}
-            />
-          </main>
+        <div className="course-chat-page__card">
+          <ConversationList
+            conversations={conversations}
+            loading={loadingList}
+            currentUserId={currentUserId}
+            activeConversationId={activeConversation?._id || null}
+            emptyText="Khóa học này chưa có cuộc trò chuyện nào."
+            onSelect={handleSelectInstructorConversation}
+          />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Nhắn tin với instructor</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Realtime chat với instructor của khóa học.
-        </p>
-      </div>
+    <div className="course-chat-page course-chat-page--student">
+      <div className="course-chat-page__card">
+        <div className="course-chat-page__hero">
+          <h1 className="course-chat-page__title">Nhắn tin với instructor</h1>
+          <p className="course-chat-page__subtitle">
+            Mở cuộc trò chuyện realtime bằng hộp chat nhỏ ở góc dưới màn hình.
+          </p>
+        </div>
 
-      <div className="min-h-[720px]">
-        <ChatBox courseId={courseId} compact={false} />
+        <div className="course-chat-page__empty-dock-card">
+          <div className="course-chat-page__empty-dock-inner">
+            <div className="course-chat-page__empty-dock-title">
+              Chat theo kiểu mini messenger
+            </div>
+            <p className="course-chat-page__empty-dock-text">
+              Nhấn nút bên dưới để mở hộp chat với instructor mà không chiếm toàn
+              bộ trang.
+            </p>
+
+            <button
+              type="button"
+              onClick={openStudentChatDock}
+              disabled={openingConversationId === "student-self"}
+              className="course-chat-page__open-btn"
+            >
+              {openingConversationId === "student-self"
+                ? "Đang mở chat..."
+                : "Mở hộp chat"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

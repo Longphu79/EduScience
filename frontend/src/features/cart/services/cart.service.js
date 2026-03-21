@@ -1,120 +1,104 @@
-const API_BASE_URL =
+const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  "http://localhost:4000";
+  "http://localhost:4000"
+).replace(/\/$/, "");
 
 function getAuthToken() {
   try {
-    const directToken =
+    return (
       localStorage.getItem("token") ||
-      localStorage.getItem("accessToken") ||
-      localStorage.getItem("authToken");
-
-    if (directToken) return directToken;
-
-    const authRaw =
-      localStorage.getItem("auth") ||
-      localStorage.getItem("auth-storage") ||
-      localStorage.getItem("eduscience_auth");
-
-    if (authRaw) {
-      const parsed = JSON.parse(authRaw);
-      return (
-        parsed?.token ||
-        parsed?.accessToken ||
-        parsed?.state?.token ||
-        parsed?.state?.accessToken ||
-        null
-      );
-    }
-  } catch (error) {
-    console.error("getAuthToken error:", error);
+      JSON.parse(localStorage.getItem("auth") || "{}")?.token ||
+      null
+    );
+  } catch {
+    return null;
   }
-
-  return null;
 }
 
-function createHeaders(extraHeaders = {}, useAuth = false) {
-  const headers = {
-    ...extraHeaders,
-  };
-
-  if (useAuth) {
+function headers(auth = false) {
+  const h = { "Content-Type": "application/json" };
+  if (auth) {
     const token = getAuthToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) h.Authorization = `Bearer ${token}`;
   }
-
-  return headers;
+  return h;
 }
 
-async function handleResponse(res, fallbackMessage = "Request failed") {
+async function handle(res, msg) {
   const data = await res.json().catch(() => null);
-
   if (!res.ok) {
-    throw new Error(data?.message || fallbackMessage);
+    const err = new Error(data?.message || msg);
+    err.status = res.status;
+    throw err;
   }
-
   return data;
 }
 
 export function cartUnwrap(res) {
-  return res?.data || res?.cart || res || { items: [] };
+  return res?.data ?? res?.cart ?? res ?? { items: [] };
+}
+
+export function emitCartUpdated() {
+  window.dispatchEvent(new CustomEvent("cart-updated"));
 }
 
 export async function getMyCart() {
   const res = await fetch(`${API_BASE_URL}/api/cart`, {
-    method: "GET",
-    headers: createHeaders({}, true),
+    headers: headers(true),
   });
-
-  return handleResponse(res, "Failed to fetch cart");
+  return handle(res, "Fetch cart failed");
 }
 
 export async function addToCart(courseId, quantity = 1) {
   const res = await fetch(`${API_BASE_URL}/api/cart/add`, {
     method: "POST",
-    headers: createHeaders({ "Content-Type": "application/json" }, true),
+    headers: headers(true),
     body: JSON.stringify({ courseId, quantity }),
   });
 
-  return handleResponse(res, "Failed to add course to cart");
-}
-
-export async function removeCartItem(courseId) {
-  const res = await fetch(`${API_BASE_URL}/api/cart/remove/${courseId}`, {
-    method: "DELETE",
-    headers: createHeaders({}, true),
-  });
-
-  return handleResponse(res, "Failed to remove cart item");
+  const data = await handle(res, "Add to cart failed");
+  emitCartUpdated();
+  return data;
 }
 
 export async function updateCartItemQuantity(courseId, quantity) {
   const res = await fetch(`${API_BASE_URL}/api/cart/update`, {
     method: "PATCH",
-    headers: createHeaders({ "Content-Type": "application/json" }, true),
+    headers: headers(true),
     body: JSON.stringify({ courseId, quantity }),
   });
+  const data = await handle(res, "Update quantity failed");
+  emitCartUpdated();
+  return data;
+}
 
-  return handleResponse(res, "Failed to update cart item quantity");
+export async function removeCartItem(courseId) {
+  const res = await fetch(`${API_BASE_URL}/api/cart/remove/${courseId}`, {
+    method: "DELETE",
+    headers: headers(true),
+  });
+  const data = await handle(res, "Remove item failed");
+  emitCartUpdated();
+  return data;
 }
 
 export async function clearCart() {
   const res = await fetch(`${API_BASE_URL}/api/cart/clear`, {
     method: "DELETE",
-    headers: createHeaders({}, true),
+    headers: headers(true),
   });
-
-  return handleResponse(res, "Failed to clear cart");
+  const data = await handle(res, "Clear cart failed");
+  emitCartUpdated();
+  return data;
 }
 
 export async function checkoutCart() {
   const res = await fetch(`${API_BASE_URL}/api/cart/checkout`, {
     method: "POST",
-    headers: createHeaders({}, true),
+    headers: headers(true),
   });
-
-  return handleResponse(res, "Failed to checkout cart");
+  const data = await handle(res, "Checkout failed");
+  emitCartUpdated();
+  return data;
 }

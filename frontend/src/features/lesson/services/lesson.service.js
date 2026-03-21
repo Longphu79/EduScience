@@ -1,7 +1,8 @@
-const API_BASE_URL =
+const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  "http://localhost:4000";
+  "http://localhost:4000"
+).replace(/\/$/, "");
 
 function getAuthToken() {
   try {
@@ -35,9 +36,7 @@ function getAuthToken() {
 }
 
 function createHeaders(extraHeaders = {}, useAuth = false) {
-  const headers = {
-    ...extraHeaders,
-  };
+  const headers = { ...extraHeaders };
 
   if (useAuth) {
     const token = getAuthToken();
@@ -49,8 +48,14 @@ function createHeaders(extraHeaders = {}, useAuth = false) {
   return headers;
 }
 
+async function parseJsonSafe(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) return null;
+  return response.json().catch(() => null);
+}
+
 async function handleResponse(response, fallbackMessage = "Request failed") {
-  const data = await response.json().catch(() => null);
+  const data = await parseJsonSafe(response);
 
   if (!response.ok) {
     throw new Error(data?.message || fallbackMessage);
@@ -59,44 +64,66 @@ async function handleResponse(response, fallbackMessage = "Request failed") {
   return data;
 }
 
-export function lessonUnwrap(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.data)) return payload.data;
-  if (payload?.data && typeof payload.data === "object") return payload.data;
-  return payload;
+async function apiRequest(path, options = {}, fallbackMessage = "Request failed") {
+  const response = await fetch(`${API_BASE_URL}${path}`, options);
+  return handleResponse(response, fallbackMessage);
 }
 
 export async function getLessonsByCourse(courseId) {
-  const response = await fetch(`${API_BASE_URL}/lesson/course/${courseId}`, {
-    headers: createHeaders({}, true),
-  });
-  return handleResponse(response, "Failed to fetch lessons");
+  if (!courseId) {
+    throw new Error("courseId is required");
+  }
+
+  return apiRequest(
+    `/lesson/course/${courseId}`,
+    {
+      headers: createHeaders({}, true),
+    },
+    "Failed to fetch lessons"
+  );
 }
 
 export async function createLesson(payload) {
-  const response = await fetch(`${API_BASE_URL}/lesson`, {
-    method: "POST",
-    headers: createHeaders({ "Content-Type": "application/json" }, true),
-    body: JSON.stringify(payload),
-  });
-  return handleResponse(response, "Failed to create lesson");
+  return apiRequest(
+    "/lesson",
+    {
+      method: "POST",
+      headers: createHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify(payload),
+    },
+    "Failed to create lesson"
+  );
 }
 
 export async function updateLesson(lessonId, payload) {
-  const response = await fetch(`${API_BASE_URL}/lesson/${lessonId}`, {
-    method: "PUT",
-    headers: createHeaders({ "Content-Type": "application/json" }, true),
-    body: JSON.stringify(payload),
-  });
-  return handleResponse(response, "Failed to update lesson");
+  if (!lessonId) {
+    throw new Error("lessonId is required");
+  }
+
+  return apiRequest(
+    `/lesson/${lessonId}`,
+    {
+      method: "PUT",
+      headers: createHeaders({ "Content-Type": "application/json" }, true),
+      body: JSON.stringify(payload),
+    },
+    "Failed to update lesson"
+  );
 }
 
 export async function deleteLesson(lessonId) {
-  const response = await fetch(`${API_BASE_URL}/lesson/${lessonId}`, {
-    method: "DELETE",
-    headers: createHeaders({}, true),
-  });
-  return handleResponse(response, "Failed to delete lesson");
+  if (!lessonId) {
+    throw new Error("lessonId is required");
+  }
+
+  return apiRequest(
+    `/lesson/${lessonId}`,
+    {
+      method: "DELETE",
+      headers: createHeaders({}, true),
+    },
+    "Failed to delete lesson"
+  );
 }
 
 export const getCourseLessons = getLessonsByCourse;

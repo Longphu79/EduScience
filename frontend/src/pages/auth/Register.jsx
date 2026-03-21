@@ -49,7 +49,7 @@ export default function Register() {
             });
             nav("/");
         } catch (err) {
-            setToast(err.message);
+            setToast(err?.message || "Register failed");
         } finally {
             setLoading(false);
         }
@@ -62,7 +62,7 @@ export default function Register() {
             footer={
                 <div className="foot__row">
                     <span className="muted">Already have an account?</span>
-                    <Link className="link" to="/login">
+                    <Link className="link" to="/auth/login">
                         Sign in
                     </Link>
                 </div>

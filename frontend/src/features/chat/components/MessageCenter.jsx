@@ -1,10 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
-import {
-  chatUnwrap,
-  listMyConversations,
-} from "../services/chat.service";
+import { Search, MessageCircleMore, X } from "lucide-react";
+import { useAuth } from "../../auth/state/useAuth";
 import ConversationList from "./ConversationList";
+import useMessageCenter from "../hooks/useMessageCenter";
 
 export default function MessageCenter({
   open,
@@ -12,109 +9,126 @@ export default function MessageCenter({
   onClose,
   onOpenConversation,
 }) {
-  const [loading, setLoading] = useState(false);
-  const [conversations, setConversations] = useState([]);
-  const [keyword, setKeyword] = useState("");
+  const { user } = useAuth();
+  const currentRole = user?.role || null;
+  const isChatAllowed =
+    currentRole === "student" || currentRole === "instructor";
 
-  async function loadConversations() {
-    try {
-      setLoading(true);
-      const response = await listMyConversations();
-      const data = chatUnwrap(response);
-      setConversations(Array.isArray(data) ? data : []);
-    } catch (error) {
-      setConversations([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!open) return;
-    loadConversations();
-  }, [open]);
-
-  const filteredConversations = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
-    if (!normalizedKeyword) return conversations;
-
-    return conversations.filter((item) => {
-      const studentName =
-        item?.studentId?.name ||
-        item?.studentId?.fullName ||
-        item?.studentId?.username ||
-        item?.studentId?.email ||
-        "";
-
-      const instructorName =
-        item?.instructorId?.name ||
-        item?.instructorId?.fullName ||
-        item?.instructorId?.username ||
-        item?.instructorId?.email ||
-        "";
-
-      const courseTitle = item?.courseId?.title || "";
-      const lastMessage = item?.lastMessage || "";
-
-      const haystack = [
-        studentName,
-        instructorName,
-        courseTitle,
-        lastMessage,
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(normalizedKeyword);
-    });
-  }, [conversations, keyword]);
+  const {
+    loading,
+    keyword,
+    filteredConversations,
+    setKeyword,
+    loadConversations,
+    markConversationReadLocally,
+  } = useMessageCenter({
+    open,
+    isChatAllowed,
+    currentUserId,
+  });
 
   if (!open) return null;
 
-  return (
-    <div className="absolute right-0 top-[calc(100%+12px)] z-[70] w-[380px] overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.16)] backdrop-blur-xl">
-      <div className="border-b border-slate-100 px-5 py-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xl font-bold text-slate-900">Đoạn chat</div>
-            <div className="text-xs text-slate-500">
-              Danh sách cuộc trò chuyện gần đây
+  if (!isChatAllowed) {
+    return (
+      <div className="absolute right-0 top-[calc(100%+14px)] z-[140] flex h-[min(78vh,720px)] w-[400px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+              <MessageCircleMore className="h-5 w-5" />
+            </div>
+
+            <div>
+              <div className="text-2xl font-extrabold text-slate-900">
+                Đoạn chat
+              </div>
+              <div className="text-sm text-slate-500">
+                Tính năng này chỉ dành cho student và instructor
+              </div>
             </div>
           </div>
 
           <button
             type="button"
-            onClick={loadConversations}
-            className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+            aria-label="Đóng"
           >
-            Refresh
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3">
-          <Search className="h-4 w-4 text-slate-400" />
+        <div className="min-h-0 flex-1 px-5 py-8 text-center text-sm text-slate-600">
+          Tài khoản admin không được mở hoặc gửi tin nhắn.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute right-0 top-[calc(100%+14px)] z-[140] flex h-[min(78vh,720px)] w-[420px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+      <div className="border-b border-slate-200 px-5 py-5">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600">
+              <MessageCircleMore className="h-5 w-5" />
+            </div>
+
+            <div className="min-w-0">
+              <div className="truncate text-2xl font-extrabold text-slate-900">
+                Đoạn chat
+              </div>
+              <div className="truncate text-sm text-slate-500">
+                Cuộc trò chuyện gần đây
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={loadConversations}
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Refresh
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              aria-label="Đóng"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 flex items-center gap-3 rounded-2xl bg-slate-100 px-4 py-3">
+          <Search className="h-4 w-4 shrink-0 text-slate-400" />
           <input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder="Tìm kiếm đoạn chat..."
-            className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+            className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
           />
         </div>
 
-        <div className="mt-4 flex items-center gap-2">
-          <span className="rounded-full bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-700">
+        <div>
+          <span className="inline-flex rounded-full bg-indigo-100 px-4 py-2 text-sm font-semibold text-indigo-700">
             Tất cả
           </span>
         </div>
       </div>
 
-      <div className="p-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 overscroll-contain">
         <ConversationList
           conversations={filteredConversations}
           loading={loading}
           currentUserId={currentUserId}
           emptyText="Bạn chưa có cuộc trò chuyện nào."
           onSelect={(conversation) => {
+            markConversationReadLocally(conversation);
             onOpenConversation?.(conversation);
             onClose?.();
           }}

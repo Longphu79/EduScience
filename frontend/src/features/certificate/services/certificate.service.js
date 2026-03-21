@@ -1,7 +1,10 @@
-const API_BASE_URL =
+import { normalizeCertificate } from "../utils/certificate.helpers";
+
+const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  "http://localhost:4000";
+  "http://localhost:4000"
+).replace(/\/$/, "");
 
 function getAuthToken() {
   try {
@@ -17,27 +20,24 @@ function getAuthToken() {
       localStorage.getItem("auth-storage") ||
       localStorage.getItem("eduscience_auth");
 
-    if (authRaw) {
-      const parsed = JSON.parse(authRaw);
-      return (
-        parsed?.token ||
-        parsed?.accessToken ||
-        parsed?.state?.token ||
-        parsed?.state?.accessToken ||
-        null
-      );
-    }
-  } catch (error) {
-    console.error("getAuthToken error:", error);
-  }
+    if (!authRaw) return null;
 
-  return null;
+    const parsed = JSON.parse(authRaw);
+
+    return (
+      parsed?.token ||
+      parsed?.accessToken ||
+      parsed?.state?.token ||
+      parsed?.state?.accessToken ||
+      null
+    );
+  } catch {
+    return null;
+  }
 }
 
-function createHeaders(extraHeaders = {}, useAuth = false) {
-  const headers = {
-    ...extraHeaders,
-  };
+function createHeaders(useAuth = false, extraHeaders = {}) {
+  const headers = { ...extraHeaders };
 
   if (useAuth) {
     const token = getAuthToken();
@@ -49,57 +49,54 @@ function createHeaders(extraHeaders = {}, useAuth = false) {
   return headers;
 }
 
-async function handleResponse(res, fallbackMessage = "Request failed") {
+async function handleResponse(res) {
   const data = await res.json().catch(() => null);
 
   if (!res.ok) {
-    throw new Error(data?.message || fallbackMessage);
+    const error = new Error(data?.message || "Request failed");
+    error.status = res.status;
+    error.payload = data;
+    throw error;
   }
 
   return data;
 }
 
-export function certificateUnwrap(res) {
-  return res?.data ?? res ?? null;
-}
-
-export async function generateCertificate(payload) {
-  const res = await fetch(`${API_BASE_URL}/certificate/generate`, {
-    method: "POST",
-    headers: createHeaders({ "Content-Type": "application/json" }, true),
-    body: JSON.stringify({
-      courseId: payload?.courseId,
-      studentId: payload?.studentId,
-      studentName: payload?.studentName,
-    }),
-  });
-
-  return handleResponse(res, "Failed to generate certificate");
+export function certificateUnwrap(payload) {
+  return payload?.data ?? payload ?? null;
 }
 
 export async function getCertificateByCourseStudent(courseId, studentId) {
   const res = await fetch(
     `${API_BASE_URL}/certificate/course/${courseId}/student/${studentId}`,
     {
-      headers: createHeaders({}, true),
+      method: "GET",
+      headers: createHeaders(true),
     }
   );
 
-  return handleResponse(res, "Failed to fetch certificate");
+  const data = await handleResponse(res);
+  return normalizeCertificate(certificateUnwrap(data));
 }
 
-export async function getCertificateById(certificateId) {
-  const res = await fetch(`${API_BASE_URL}/certificate/${certificateId}`, {
-    headers: createHeaders({}, true),
+export async function generateCertificate(payload) {
+  const res = await fetch(`${API_BASE_URL}/certificate/generate`, {
+    method: "POST",
+    headers: createHeaders(true, {
+      "Content-Type": "application/json",
+    }),
+    body: JSON.stringify(payload),
   });
 
-  return handleResponse(res, "Failed to fetch certificate by id");
+  const data = await handleResponse(res);
+  return normalizeCertificate(certificateUnwrap(data));
 }
 
 export async function getCertificateByCode(code) {
   const res = await fetch(`${API_BASE_URL}/certificate/public/${code}`, {
-    headers: createHeaders(),
+    method: "GET",
   });
 
-  return handleResponse(res, "Failed to fetch public certificate");
+  const data = await handleResponse(res);
+  return normalizeCertificate(certificateUnwrap(data));
 }

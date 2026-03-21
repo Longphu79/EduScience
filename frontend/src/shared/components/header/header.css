@@ -1,0 +1,54 @@
+.header-shell {
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.header-shell__inner {
+  position: relative;
+}
+
+.header-brand {
+  min-width: fit-content;
+}
+
+.header-brand__mark {
+  will-change: transform;
+}
+
+.header-desktop-nav {
+  min-width: 0;
+}
+
+.header-actions {
+  min-width: fit-content;
+}
+
+.header-user-menu {
+  animation: headerMenuFadeIn 0.18s ease-out;
+  transform-origin: top right;
+}
+
+.header-mobile-panel {
+  animation: headerMobileSlideDown 0.2s ease-out;
+}
+
+@keyframes headerMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes headerMobileSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

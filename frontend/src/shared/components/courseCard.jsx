@@ -156,9 +156,7 @@ export function CourseCard({ course }) {
 
       if (isFreeCourse) {
         setProcessing(true);
-        await enrollCourse({
-          courseId: course._id,
-        });
+        await enrollCourse(course._id);
         setIsEnrolled(true);
         setIsInCart(false);
         setToast({
@@ -264,7 +262,7 @@ export function CourseCard({ course }) {
               </span>
             </div>
 
-            <h3 className="mb-3 min-h-[3.5rem] text-[20px] font-bold leading-snug text-slate-950 line-clamp-2">
+            <h3 className="mb-3 min-h-[3.5rem] line-clamp-2 text-[20px] font-bold leading-snug text-slate-950">
               {course?.title}
             </h3>
 

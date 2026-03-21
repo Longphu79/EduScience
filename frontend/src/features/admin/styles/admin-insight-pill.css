@@ -1,0 +1,72 @@
+.admin-insight-pill__link {
+  display: block;
+  text-decoration: none;
+}
+
+.admin-insight-pill {
+  border: 1px solid;
+  border-radius: 20px;
+  padding: 16px;
+  transition: 0.2s ease;
+}
+
+.admin-insight-pill:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.admin-insight-pill__label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  opacity: 0.8;
+}
+
+.admin-insight-pill__value {
+  margin-top: 8px;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.admin-insight-pill__hint {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.admin-insight-pill--slate {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #e2e8f0;
+}
+
+.admin-insight-pill--indigo {
+  background: #e0e7ff;
+  color: #4338ca;
+  border-color: #c7d2fe;
+}
+
+.admin-insight-pill--emerald {
+  background: #d1fae5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.admin-insight-pill--amber {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.admin-insight-pill--rose {
+  background: #ffe4e6;
+  color: #be123c;
+  border-color: #fecdd3;
+}
+
+.admin-insight-pill--red {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}

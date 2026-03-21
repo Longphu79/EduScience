@@ -1,0 +1,24 @@
+.user-profile-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 24px 16px;
+}
+
+.user-profile-page__container {
+  max-width: 80rem;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+
+.user-profile-page__split {
+  display: grid;
+  gap: 24px;
+}
+
+@media (min-width: 1280px) {
+  .user-profile-page__split {
+    grid-template-columns: 0.95fr 1.05fr;
+    align-items: start;
+  }
+}

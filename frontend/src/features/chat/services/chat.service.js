@@ -1,9 +1,10 @@
 import { io } from "socket.io-client";
 
-const API_BASE_URL =
+const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
-  "http://localhost:4000";
+  "http://localhost:4000"
+).replace(/\/$/, "");
 
 let socketInstance = null;
 
@@ -21,27 +22,24 @@ function getAuthToken() {
       localStorage.getItem("auth-storage") ||
       localStorage.getItem("eduscience_auth");
 
-    if (authRaw) {
-      const parsed = JSON.parse(authRaw);
-      return (
-        parsed?.token ||
-        parsed?.accessToken ||
-        parsed?.state?.token ||
-        parsed?.state?.accessToken ||
-        null
-      );
-    }
+    if (!authRaw) return null;
+
+    const parsed = JSON.parse(authRaw);
+    return (
+      parsed?.token ||
+      parsed?.accessToken ||
+      parsed?.state?.token ||
+      parsed?.state?.accessToken ||
+      null
+    );
   } catch (error) {
     console.error("getAuthToken error:", error);
+    return null;
   }
-
-  return null;
 }
 
 function createHeaders(extraHeaders = {}, useAuth = false) {
-  const headers = {
-    ...extraHeaders,
-  };
+  const headers = { ...extraHeaders };
 
   if (useAuth) {
     const token = getAuthToken();
@@ -57,7 +55,10 @@ async function handleResponse(response, fallbackMessage = "Request failed") {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data?.message || fallbackMessage);
+    const error = new Error(data?.message || fallbackMessage);
+    error.status = response.status;
+    error.payload = data;
+    throw error;
   }
 
   return data;
@@ -65,35 +66,6 @@ async function handleResponse(response, fallbackMessage = "Request failed") {
 
 export function chatUnwrap(payload) {
   return payload?.data ?? payload ?? null;
-}
-
-export function getParticipantName(participant) {
-  if (!participant) return "User";
-
-  return (
-    participant?.name ||
-    participant?.fullName ||
-    participant?.username ||
-    participant?.displayName ||
-    participant?.email ||
-    "User"
-  );
-}
-
-export function getConversationOtherParty(conversation, currentUserId) {
-  if (!conversation) return null;
-
-  const student = conversation?.studentId;
-  const instructor = conversation?.instructorId;
-
-  const studentId = student?._id || student?.id || student;
-  const instructorId = instructor?._id || instructor?.id || instructor;
-
-  if (String(studentId) === String(currentUserId)) {
-    return instructor || null;
-  }
-
-  return student || null;
 }
 
 export async function ensureConversation(courseId, studentId) {
@@ -154,22 +126,58 @@ export async function sendConversationMessage(conversationId, payload) {
   return handleResponse(response, "Failed to send conversation message");
 }
 
+export async function getMyUnreadSummary() {
+  const response = await fetch(
+    `${API_BASE_URL}/chat/conversations/unread-summary`,
+    {
+      headers: createHeaders({}, true),
+    }
+  );
+
+  return handleResponse(response, "Failed to fetch unread summary");
+}
+
+export async function markConversationAsRead(conversationId) {
+  const response = await fetch(
+    `${API_BASE_URL}/chat/conversation/${conversationId}/read`,
+    {
+      method: "POST",
+      headers: createHeaders({ "Content-Type": "application/json" }, true),
+    }
+  );
+
+  return handleResponse(response, "Failed to mark conversation as read");
+}
+
+function createSocket(token) {
+  return io(API_BASE_URL, {
+    transports: ["websocket"],
+    autoConnect: true,
+    auth: { token },
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 800,
+    reconnectionDelayMax: 4000,
+  });
+}
+
 export function getChatSocket() {
   const token = getAuthToken();
 
-  if (socketInstance && socketInstance.connected) {
+  if (!socketInstance) {
+    socketInstance = createSocket(token);
     return socketInstance;
   }
 
-  if (!socketInstance) {
-    socketInstance = io(API_BASE_URL, {
-      transports: ["websocket"],
-      autoConnect: true,
-      auth: {
-        token,
-      },
-    });
-  } else if (!socketInstance.connected) {
+  const currentSocketToken = socketInstance.auth?.token || null;
+
+  if (currentSocketToken !== token) {
+    socketInstance.disconnect();
+    socketInstance = createSocket(token);
+    return socketInstance;
+  }
+
+  if (!socketInstance.connected) {
     socketInstance.auth = { token };
     socketInstance.connect();
   }

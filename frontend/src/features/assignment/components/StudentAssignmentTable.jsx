@@ -1,34 +1,38 @@
-import React from "react";
+import {
+  getLatestSubmissionInfo,
+  getSubmissionId,
+} from "../utils/assignment.helpers";
+import "../styles/assignment-components.css";
 
 export default function StudentAssignmentTable({ submissions = [] }) {
-  if (!submissions.length) return <p>Chưa có bài nộp.</p>;
+  if (!submissions.length) {
+    return (
+      <div className="student-assignment-table__empty">Chưa có bài nộp.</div>
+    );
+  }
 
   return (
-    <table width="100%" border="1" cellPadding="8">
-      <thead>
-        <tr>
-          <th>Assignment</th>
-          <th>Status</th>
-          <th>Grade</th>
-          <th>Submitted At</th>
-        </tr>
-      </thead>
-      <tbody>
-        {submissions.map((item) => (
-          <tr key={item._id}>
-            <td>{item.assignmentId?.title}</td>
-            <td>{item.status}</td>
-            <td>{item.grade ?? "Not graded"}</td>
-            <td>
-              {item.submittedAt
-                ? new Date(item.submittedAt).toLocaleString()
-                : item.createdAt
-                ? new Date(item.createdAt).toLocaleString()
-                : "N/A"}
-            </td>
+    <div className="student-assignment-table">
+      <table className="student-assignment-table__table">
+        <thead>
+          <tr>
+            <th>Assignment</th>
+            <th>Status</th>
+            <th>Grade</th>
+            <th>Submitted At</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {submissions.map((item) => (
+            <tr key={getSubmissionId(item)}>
+              <td>{item.assignmentId?.title || "N/A"}</td>
+              <td>{item.status}</td>
+              <td>{item.grade ?? "Not graded"}</td>
+              <td>{getLatestSubmissionInfo(item)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

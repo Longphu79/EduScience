@@ -1,0 +1,36 @@
+.admin-tabs {
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  background: #ffffff;
+  padding: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.admin-tabs__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.admin-tabs__item {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  text-decoration: none;
+  border-radius: 18px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: 0.2s ease;
+}
+
+.admin-tabs__item:hover {
+  background: #f8fafc;
+}
+
+.admin-tabs__item--active {
+  border-color: transparent;
+  background: linear-gradient(to right, #ef4444, #f43f5e);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.18);
+}

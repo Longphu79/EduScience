@@ -3,59 +3,101 @@ import { AuthContext } from "./AuthContext";
 import { loginApi, registerApi } from "../api/authApi.js";
 
 export default function AuthProvider({ children }) {
-    const [token, setToken] = useState(null);
-    const [user, setUser] = useState(null);
-    const [booting, setBooting] = useState(true);
+  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(null);
+  const [booting, setBooting] = useState(true);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => {
-        const t = localStorage.getItem("token");
-        const u = localStorage.getItem("user");
+  useEffect(() => {
+    try {
+      const storedToken = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
 
-        setToken(t);
-        setUser(u ? JSON.parse(u) : null);
-        setBooting(false);
-    }, []);
+      const parsedUser = storedUser ? JSON.parse(storedUser) : null;
 
-    const login = async ({ username, password }) => {
-        const data = await loginApi({ username, password });
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        setToken(data.token);
-        setUser(data.user);
-        return data;
-    };
-
-    const register = async ({ username, email, password, role }) => {
-        const data = await registerApi({ username, email, password, role });
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        setToken(data.token);
-        setUser(data.user);
-        return data;
-    };
-
-    const logout = () => {
+      if (storedToken && parsedUser) {
+        setToken(storedToken);
+        setUser(parsedUser);
+      } else {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         setToken(null);
         setUser(null);
-    };
+      }
+    } catch (error) {
+      console.error("Auth boot error:", error);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      setToken(null);
+      setUser(null);
+    } finally {
+      setBooting(false);
+    }
+  }, []);
 
-    const value = useMemo(
-        () => ({
-            token,
-            user,
-            booting,
-            isAuthenticated: !!user,
-            login,
-            register,
-            logout,
-        }),
-        [token, user, booting],
-    );
+  const persistAuth = (nextToken, nextUser) => {
+    if (nextToken && nextUser) {
+      localStorage.setItem("token", nextToken);
+      localStorage.setItem("user", JSON.stringify(nextUser));
+      setToken(nextToken);
+      setUser(nextUser);
+      return;
+    }
 
-    return (
-        <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-    );
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setToken(null);
+    setUser(null);
+  };
+
+  const login = async ({ username, password }) => {
+    const data = await loginApi({ username, password });
+    persistAuth(data?.token, data?.user);
+    return data;
+  };
+
+  const register = async ({ username, email, password, role }) => {
+    const data = await registerApi({ username, email, password, role });
+    persistAuth(data?.token, data?.user);
+    return data;
+  };
+
+  const updateCurrentUser = (nextUser) => {
+    if (!nextUser) return;
+    setUser(nextUser);
+    localStorage.setItem("user", JSON.stringify(nextUser));
+  };
+
+  const mergeCurrentUser = (partialUser) => {
+    setUser((prev) => {
+      const merged = {
+        ...(prev || {}),
+        ...(partialUser || {}),
+      };
+
+      localStorage.setItem("user", JSON.stringify(merged));
+      return merged;
+    });
+  };
+
+  const logout = () => {
+    persistAuth(null, null);
+  };
+
+  const value = useMemo(
+    () => ({
+      token,
+      user,
+      setUser,
+      booting,
+      isAuthenticated: !!token && !!user,
+      login,
+      register,
+      logout,
+      updateCurrentUser,
+      mergeCurrentUser,
+    }),
+    [token, user, booting]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

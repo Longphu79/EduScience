@@ -1,220 +1,97 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import Toast from "../../../shared/components/Toast";
-import Button from "../../../shared/components/Button";
-import {
-  certificateUnwrap,
-  getCertificateByCode,
-} from "../services/certificate.service";
-
-function formatDate(value) {
-  if (!value) return "N/A";
-
-  try {
-    return new Date(value).toLocaleDateString("vi-VN");
-  } catch {
-    return "N/A";
-  }
-}
-
-function getDisplayStudentName(certificate) {
-  return certificate?.studentName || "Student";
-}
-
-function CertificateShowcase({ certificate }) {
-  const displayStudentName = getDisplayStudentName(certificate);
-  const courseTitle = certificate?.courseTitle || "Completed Course";
-
-  return (
-    <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.10)]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.10),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.12),transparent_32%)]" />
-
-      <div className="relative p-5 md:p-8 lg:p-10">
-        <div className="rounded-[28px] border border-dashed border-blue-200 bg-slate-50/70 px-6 py-10 md:px-10 md:py-14">
-          <div className="mx-auto max-w-4xl text-center">
-            <div className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.35em] text-emerald-700 shadow-sm">
-              Publicly Verified
-            </div>
-
-            <div className="mt-8">
-              <p className="text-sm font-medium uppercase tracking-[0.4em] text-slate-400">
-                EduScience
-              </p>
-              <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-950 md:text-6xl">
-                CERTIFICATE
-              </h1>
-              <p className="mt-2 text-xl text-slate-600 md:text-2xl">
-                of Completion
-              </p>
-            </div>
-
-            <div className="mt-10 space-y-4">
-              <p className="text-base text-slate-500">Presented to</p>
-
-              <h2 className="break-words text-3xl font-extrabold text-blue-600 md:text-5xl">
-                {displayStudentName}
-              </h2>
-
-              <p className="mx-auto max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
-                for successfully completing the course
-              </p>
-
-              <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                <p className="break-words text-2xl font-black text-slate-950 md:text-4xl">
-                  {courseTitle}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Certificate code
-                </div>
-                <div className="mt-3 break-all text-sm font-extrabold text-slate-900 md:text-base">
-                  {certificate?.certificateCode || "N/A"}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Completion date
-                </div>
-                <div className="mt-3 text-xl font-black text-slate-900">
-                  {formatDate(certificate?.completionDate)}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Issued at
-                </div>
-                <div className="mt-3 text-xl font-black text-slate-900">
-                  {formatDate(certificate?.issuedAt)}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-10 flex flex-col items-center justify-center gap-3 md:flex-row">
-              <div className="rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white">
-                Authentic certificate verified
-              </div>
-              <div className="rounded-full border border-slate-200 bg-white px-5 py-2 text-sm text-slate-600">
-                Issued by EduScience
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { useMemo } from "react";
+import CertificateDetailsPanel from "../components/CertificateDetailsPanel";
+import CertificateEmptyState from "../components/CertificateEmptyState";
+import CertificateHeroCard from "../components/CertificateHeroCard";
+import CertificatePreviewCard from "../components/CertificatePreviewCard";
+import CertificateStatusPanel from "../components/CertificateStatusPanel";
+import CertificateLinkPanel from "../components/CertificateLinkPanel";
+import usePublicCertificatePage from "../hooks/usePublicCertificatePage";
+import "../styles/certificate-components.css";
+import "../styles/certificate-pages.css";
 
 export default function PublicCertificatePage() {
-  const { code } = useParams();
+  const { certificate, loading } = usePublicCertificatePage();
 
-  const [certificate, setCertificate] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState({ message: "", kind: "success" });
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadCertificate() {
-      try {
-        setLoading(true);
-        const res = await getCertificateByCode(code);
-        const data = certificateUnwrap(res);
-
-        if (isMounted) {
-          setCertificate(data);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setToast({
-            message: error?.message || "Không tải được chứng chỉ công khai",
-            kind: "error",
-          });
-          setCertificate(null);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    if (code) {
-      loadCertificate();
-    } else {
-      setLoading(false);
-      setCertificate(null);
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [code]);
-
-  const statusText = useMemo(() => {
-    return certificate
-      ? "Certificate verified successfully"
-      : "Verification unavailable";
+  const safePublicLink = useMemo(() => {
+    if (!certificate?.certificateCode) return "";
+    return `${window.location.origin}/certificate/${certificate.certificateCode}`;
   }, [certificate]);
 
-  return (
-    <div className="mx-auto max-w-7xl px-4 py-8">
-      {toast.message ? (
-        <Toast
-          message={toast.message}
-          kind={toast.kind}
-          onClose={() => setToast({ message: "", kind: "success" })}
-        />
-      ) : null}
+  async function handleCopyLink() {
+    if (!safePublicLink) {
+      window.alert("Chưa có public link để sao chép");
+      return;
+    }
 
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-3xl font-black text-slate-950">
-            Public Certificate
-          </h1>
-          <p className="mt-2 text-slate-600">
-            Xác thực chứng chỉ hoàn thành khóa học
-          </p>
-        </div>
+    try {
+      await navigator.clipboard.writeText(safePublicLink);
+      window.alert("Đã sao chép link chứng chỉ");
+    } catch {
+      const input = document.createElement("input");
+      input.value = safePublicLink;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      window.alert("Đã sao chép link chứng chỉ");
+    }
+  }
 
-        <div className="flex flex-wrap gap-3">
-          <div className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
-            {statusText}
-          </div>
-
-          <Link to="/">
-            <Button type="button">Trang chủ</Button>
-          </Link>
+  if (loading) {
+    return (
+      <div className="certificate-page">
+        <div className="certificate-page__state-card">
+          Đang tải chứng chỉ công khai...
         </div>
       </div>
+    );
+  }
 
-      {loading ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-slate-500 shadow-sm">
-          Đang tải chứng chỉ...
-        </div>
-      ) : certificate ? (
-        <CertificateShowcase certificate={certificate} />
-      ) : (
-        <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
-          <h2 className="text-2xl font-black text-slate-950">
-            Không tìm thấy chứng chỉ
-          </h2>
-          <p className="mt-3 text-slate-600">
-            Link chứng chỉ không hợp lệ hoặc chứng chỉ đã không còn tồn tại.
-          </p>
+  if (!certificate) {
+    return (
+      <div className="certificate-page">
+        <CertificateEmptyState title="Không tìm thấy chứng chỉ" />
+      </div>
+    );
+  }
 
-          <div className="mt-6">
-            <Link to="/">
-              <Button type="button">Về trang chủ</Button>
-            </Link>
-          </div>
+  return (
+    <div className="certificate-page">
+      <CertificateHeroCard
+        title="Public Certificate"
+        subtitle={`Issued to ${certificate?.studentName || "Student"}`}
+        statusText="Verified"
+        statusVariant="success"
+      />
+
+      <div className="certificate-page__grid">
+        <div className="certificate-page__main">
+          <CertificatePreviewCard certificate={certificate} />
+          <CertificateDetailsPanel
+            certificate={certificate}
+            title="Certificate details"
+          />
         </div>
-      )}
+
+        <aside className="certificate-page__sidebar">
+          <CertificateStatusPanel
+            title="Verification status"
+            paragraphs={[
+              "This is a public certificate page.",
+              "Use the link below to share or verify this certificate.",
+            ]}
+            statusTitle="Verified"
+            statusText={certificate?.certificateCode || "Certificate is valid"}
+            variant="info"
+          />
+
+          <CertificateLinkPanel
+            title="Public verification link"
+            link={safePublicLink}
+            onCopy={handleCopyLink}
+          />
+        </aside>
+      </div>
     </div>
   );
 }

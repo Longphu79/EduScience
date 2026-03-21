@@ -1,85 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import {
-  getQuizByCourse,
-  getAttemptsByStudentCourse,
-  quizUnwrap,
-} from "../services/quiz.service";
-import { useAuth } from "../../auth/state/useAuth";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
 import Toast from "../../../shared/components/Toast";
-
-function groupAttemptsByQuiz(attempts = []) {
-  const map = {};
-
-  for (const attempt of attempts) {
-    const quizId =
-      attempt.quizId?._id || attempt.quizId || attempt.quiz?._id || attempt.quiz;
-
-    if (!quizId) continue;
-    if (!map[quizId]) map[quizId] = [];
-    map[quizId].push(attempt);
-  }
-
-  Object.keys(map).forEach((quizId) => {
-    map[quizId].sort(
-      (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
-    );
-  });
-
-  return map;
-}
-
-function getAttemptSummary(attempt, quiz) {
-  if (!attempt) {
-    return {
-      score: 0,
-      correctAnswers: 0,
-      totalQuestions: quiz?.questions?.length || 0,
-      passed: false,
-    };
-  }
-
-  const score = Number(attempt.score || 0);
-
-  let totalQuestions =
-    Number(attempt.totalQuestions || 0) || quiz?.questions?.length || 0;
-
-  let correctAnswers = Number(attempt.correctAnswers || 0);
-
-  if (
-    (!correctAnswers || correctAnswers === 0) &&
-    Array.isArray(attempt.questionReviews)
-  ) {
-    correctAnswers = attempt.questionReviews.filter((q) => q?.isCorrect).length;
-    if (!totalQuestions) {
-      totalQuestions = attempt.questionReviews.length;
-    }
-  }
-
-  if (
-    totalQuestions > 0 &&
-    correctAnswers === 0 &&
-    score > 0 &&
-    !Array.isArray(attempt.questionReviews)
-  ) {
-    correctAnswers = Math.round((score * totalQuestions) / 100);
-  }
-
-  const passed =
-    typeof attempt.passed === "boolean"
-      ? attempt.passed
-      : score >= Number(quiz?.passingScore || 0);
-
-  return {
-    score,
-    correctAnswers,
-    totalQuestions,
-    passed,
-  };
-}
+import { useAuth } from "../../auth/state/useAuth";
+import {
+  getAttemptsByStudentCourse,
+  getQuizByCourse,
+} from "../services/quiz.service";
+import {
+  getAttemptSummary,
+  getQuizId,
+  getStudentQuizStatusMeta,
+  groupAttemptsByQuiz,
+  normalizeAttemptList,
+  normalizeQuizList,
+  quizUnwrap,
+} from "../utils/quiz.helpers";
+import QuizListItem from "./QuizListItem";
 
 export default function QuizList({ courseId }) {
   const { user } = useAuth();
+  const location = useLocation();
   const { courseId: routeCourseId } = useParams();
 
   const finalCourseId = courseId || routeCourseId;
@@ -90,47 +30,64 @@ export default function QuizList({ courseId }) {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ message: "", kind: "success" });
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setLoading(true);
+  const loadData = useCallback(async () => {
+    if (!finalCourseId) return;
 
-        const quizRes = await getQuizByCourse(finalCourseId);
-        const quizList = quizUnwrap(quizRes) || [];
+    try {
+      setLoading(true);
 
-        setQuizzes(Array.isArray(quizList) ? quizList : []);
+      const quizRes = await getQuizByCourse(finalCourseId);
+      const quizList = normalizeQuizList(quizUnwrap(quizRes)).filter(
+        (quiz) => quiz?.isPublished
+      );
+      setQuizzes(quizList);
 
-        if (studentId && finalCourseId) {
-          try {
-            const attemptRes = await getAttemptsByStudentCourse(finalCourseId);
-            const attemptList = quizUnwrap(attemptRes) || [];
-            setAttempts(Array.isArray(attemptList) ? attemptList : []);
-          } catch (attemptError) {
-            console.error("Load quiz attempts error:", attemptError);
-            setAttempts([]);
-          }
-        } else {
+      if (studentId) {
+        try {
+          const attemptRes = await getAttemptsByStudentCourse(finalCourseId);
+          const attemptList = normalizeAttemptList(quizUnwrap(attemptRes));
+          setAttempts(attemptList);
+        } catch (attemptError) {
+          console.error("Load quiz attempts error:", attemptError);
           setAttempts([]);
         }
-      } catch (error) {
-        setToast({
-          message: error?.message || "Không tải được danh sách quiz",
-          kind: "error",
-        });
-        setQuizzes([]);
+      } else {
         setAttempts([]);
-      } finally {
-        setLoading(false);
       }
+    } catch (error) {
+      setToast({
+        message: error?.message || "Không tải được danh sách quiz",
+        kind: "error",
+      });
+      setQuizzes([]);
+      setAttempts([]);
+    } finally {
+      setLoading(false);
     }
-
-    if (finalCourseId) fetchData();
   }, [finalCourseId, studentId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData, location.pathname, location.search]);
 
   const attemptsMap = useMemo(() => groupAttemptsByQuiz(attempts), [attempts]);
 
   if (loading) {
-    return <p>Đang tải quiz...</p>;
+    return (
+      <div className="space-y-4">
+        {[1, 2].map((item) => (
+          <div
+            key={item}
+            className="animate-pulse rounded-[24px] border border-slate-200 bg-white p-5"
+          >
+            <div className="h-5 w-44 rounded bg-slate-200" />
+            <div className="mt-3 h-4 w-full rounded bg-slate-100" />
+            <div className="mt-2 h-4 w-2/3 rounded bg-slate-100" />
+            <div className="mt-4 h-10 w-32 rounded-xl bg-slate-200" />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (!quizzes.length) {
@@ -143,7 +100,15 @@ export default function QuizList({ courseId }) {
             onClose={() => setToast({ message: "", kind: "success" })}
           />
         ) : null}
-        <p className="text-slate-600">Chưa có quiz nào.</p>
+
+        <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-8 text-center shadow-sm">
+          <div className="text-base font-semibold text-slate-800">
+            Chưa có quiz nào
+          </div>
+          <div className="mt-2 text-sm text-slate-500">
+            Instructor chưa tạo quiz cho khóa học này.
+          </div>
+        </div>
       </>
     );
   }
@@ -158,89 +123,26 @@ export default function QuizList({ courseId }) {
         />
       ) : null}
 
-      {quizzes.map((item) => {
-        const quizAttempts = attemptsMap[item._id] || [];
+      {quizzes.map((quiz) => {
+        const quizId = getQuizId(quiz);
+        const quizAttempts = attemptsMap[quizId] || [];
         const latestAttempt = quizAttempts[0] || null;
-        const summary = getAttemptSummary(latestAttempt, item);
+        const summary = getAttemptSummary(latestAttempt, quiz);
+        const statusMeta = getStudentQuizStatusMeta(
+          quiz,
+          latestAttempt,
+          summary
+        );
 
         return (
-          <div
-            key={item._id}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h4 className="text-lg font-semibold text-slate-900">
-                    {item.title}
-                  </h4>
-
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      item.isPublished
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    {item.isPublished ? "Published" : "Draft"}
-                  </span>
-                </div>
-
-                <p className="text-slate-600">
-                  {item.description || "Chưa có mô tả quiz."}
-                </p>
-
-                <div className="flex flex-wrap gap-3 text-sm text-slate-500">
-                  <span className="rounded-full bg-slate-100 px-3 py-1">
-                    Questions: {item.questions?.length || 0}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1">
-                    Passing: {item.passingScore || 0}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1">
-                    Time: {item.timeLimit || 0} phút
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1">
-                    Attempts: {quizAttempts.length}
-                  </span>
-                </div>
-
-                {latestAttempt ? (
-                  <div className="mt-2 rounded-xl border bg-slate-50 p-4 text-sm text-slate-700">
-                    <div>Latest score: {summary.score}</div>
-                    <div>
-                      Correct: {summary.correctAnswers}/{summary.totalQuestions}
-                    </div>
-                    <div>
-                      Status:{" "}
-                      <span
-                        className={
-                          summary.passed
-                            ? "font-semibold text-emerald-600"
-                            : "font-semibold text-red-500"
-                        }
-                      >
-                        {summary.passed ? "Passed" : "Not passed"}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-2 text-sm text-slate-500">
-                    Bạn chưa làm quiz này.
-                  </div>
-                )}
-              </div>
-
-              <div className="shrink-0">
-                <Link
-                  to={`/learn/${finalCourseId}/quizzes/${item._id}`}
-                  className="inline-flex items-center rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-3 font-semibold text-white shadow-sm"
-                >
-                  {latestAttempt ? "Làm lại quiz" : "Làm quiz"}
-                </Link>
-              </div>
-            </div>
-          </div>
+          <QuizListItem
+            key={quizId}
+            item={quiz}
+            finalCourseId={finalCourseId}
+            quizAttempts={quizAttempts}
+            summary={summary}
+            statusMeta={statusMeta}
+          />
         );
       })}
     </div>

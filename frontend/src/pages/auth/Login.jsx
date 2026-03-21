@@ -36,7 +36,7 @@ export default function Login() {
             await login({ username: username.trim(), password });
             nav("/");
         } catch (err) {
-            setToast(err.message);
+            setToast(err?.message || "Login failed");
         } finally {
             setLoading(false);
         }
@@ -49,7 +49,7 @@ export default function Login() {
             footer={
                 <div className="foot__row">
                     <span className="muted">New here?</span>
-                    <Link className="link" to="/register">
+                    <Link className="link" to="/auth/register">
                         Create an account
                     </Link>
                 </div>
