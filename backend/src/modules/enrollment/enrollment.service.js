@@ -303,12 +303,14 @@ export const getInstructorDashboardSummary = async (instructorId) => {
 };
 
 export const getMyCourses = async (studentId) => {
-  return Enrollment.find({ studentId })
+  const enrollments = await Enrollment.find({ studentId })
     .populate({
       path: "courseId",
       populate: [{ path: "instructorId" }, lessonPopulateConfig],
     })
     .sort({ createdAt: -1 });
+
+  return enrollments.filter((item) => item.courseId);
 };
 
 export const getInstructorCourses = async (instructorId) => {

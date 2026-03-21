@@ -17,7 +17,6 @@ const router = express.Router();
 
 router.post("/enroll", verifyToken, enrollCourse);
 
-// dashboard
 router.get("/dashboard/student/:studentId", verifyToken, getStudentDashboardSummary);
 router.get(
   "/dashboard/instructor/:instructorId",
@@ -25,7 +24,6 @@ router.get(
   getInstructorDashboardSummary
 );
 
-// student
 router.get("/student/:studentId", verifyToken, getMyCourses);
 router.get(
   "/student/:studentId/course/:courseId",
@@ -35,7 +33,6 @@ router.get(
 router.patch("/current-lesson", verifyToken, setCurrentLesson);
 router.patch("/complete-lesson", verifyToken, completeLesson);
 
-// instructor
 router.get("/instructor/:instructorId", verifyToken, getInstructorCourses);
 router.get("/course/:courseId/students", verifyToken, getStudentsByCourse);
 router.get(
