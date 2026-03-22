@@ -22,25 +22,46 @@ import { sendSuccess } from "./utils/response.js";
 
 const app = express();
 
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  })
-);
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+  .split(",")
+  .map((item) => item.trim())
+  .filter(Boolean);
 
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true, limit: "2mb" }));
+const corsOptions = {
+  origin(origin, callback) {
+    // Cho phép Postman, server-to-server, mobile app, request không có origin
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   return sendSuccess(res, {
     statusCode: 200,
     message: "Server is running",
-    data: null,
+    data: {
+      app: "EduScience backend",
+      status: "ok",
+    },
   });
 });
+
 
 app.use("/auth", authRoute);
 app.use("/course", courseRoute);

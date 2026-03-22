@@ -15,6 +15,6 @@ export async function connectDatabase() {
     console.log('✅ MongoDB connected successfully');
   } catch (error) {
     console.error('❌ MongoDB connection error:', error.message);
-    process.exit(1); // dừng app nếu kết nối DB lỗi
+    process.exit(1); 
   }
 }
