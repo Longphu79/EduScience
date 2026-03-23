@@ -76,6 +76,8 @@ export function Header() {
 
   useEffect(() => {
     async function loadUnreadCount() {
+      if (booting) return;
+
       if (!isAuthenticated || !canUseChat) {
         setConversationCount(0);
         return;
@@ -91,15 +93,18 @@ export function Header() {
     }
 
     loadUnreadCount();
-  }, [isAuthenticated, canUseChat, location.pathname]);
+  }, [booting, isAuthenticated, canUseChat, location.pathname]);
 
   useEffect(() => {
+    if (booting) return;
+
     if (!isAuthenticated || !canUseChat) {
       setConversationCount(0);
       return;
     }
 
     const socket = getChatSocket();
+    if (!socket) return;
 
     const handleUnreadUpdated = (payload) => {
       setConversationCount(Number(payload?.unreadMessages || 0));
@@ -110,7 +115,7 @@ export function Header() {
     return () => {
       socket.off("chat:unread-updated", handleUnreadUpdated);
     };
-  }, [isAuthenticated, canUseChat]);
+  }, [booting, isAuthenticated, canUseChat]);
 
   async function handleLogout() {
     try {

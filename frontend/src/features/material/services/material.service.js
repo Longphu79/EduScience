@@ -75,6 +75,23 @@ async function apiRequest(
   return handleResponse(response, fallbackMessage);
 }
 
+export async function uploadMaterialFile(file) {
+  if (!file) {
+    throw new Error("File is required");
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/upload/material`, {
+    method: "POST",
+    headers: createHeaders({}, true),
+    body: formData,
+  });
+
+  return handleResponse(response, "Failed to upload file");
+}
+
 export async function getMaterialsByCourse(courseId) {
   if (!courseId) {
     throw new Error("courseId is required");

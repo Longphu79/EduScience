@@ -11,6 +11,7 @@ import {
   deleteMaterial,
   getMaterialsByCourse,
   updateMaterial,
+  uploadMaterialFile,
 } from "../services/material.service";
 import {
   getDefaultMaterialForm,
@@ -25,6 +26,15 @@ function getInstructorId(user) {
   return user?._id || user?.id || user?.userId || null;
 }
 
+function extractFileType(file) {
+  if (!file) return "";
+  if (file.type) return file.type;
+
+  const fileName = file.name || "";
+  const parts = fileName.split(".");
+  return parts.length > 1 ? parts.pop().toLowerCase() : "";
+}
+
 export default function useInstructorMaterialManagePage() {
   const { courseId } = useParams();
   const { user } = useAuth();
@@ -36,8 +46,10 @@ export default function useInstructorMaterialManagePage() {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState("");
   const [editingMaterialId, setEditingMaterialId] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
   const [form, setForm] = useState(getDefaultMaterialForm());
   const [toast, setToast] = useState({
     message: "",
@@ -55,7 +67,13 @@ export default function useInstructorMaterialManagePage() {
       ]);
 
       setCourse(courseUnwrap(courseRes) || null);
-      setLessons(sortLessonsByOrder(Array.isArray(lessonRes?.data) ? lessonRes.data : lessonRes?.data?.data || lessonRes || []));
+      setLessons(
+        sortLessonsByOrder(
+          Array.isArray(lessonRes?.data)
+            ? lessonRes.data
+            : lessonRes?.data?.data || lessonRes || []
+        )
+      );
       setMaterials(normalizeMaterialList(materialRes));
     } catch (error) {
       setToast({
@@ -78,6 +96,7 @@ export default function useInstructorMaterialManagePage() {
 
   const resetForm = useCallback(() => {
     setEditingMaterialId("");
+    setSelectedFile(null);
     setForm(getDefaultMaterialForm());
   }, []);
 
@@ -95,8 +114,23 @@ export default function useInstructorMaterialManagePage() {
     }));
   }, []);
 
+  const handleFileChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+
+    setForm((prev) => ({
+      ...prev,
+      fileName: file.name || "",
+      fileType: extractFileType(file),
+      fileSize: Number(file.size || 0),
+    }));
+  }, []);
+
   const handleEdit = useCallback((item) => {
     setEditingMaterialId(getMaterialId(item));
+    setSelectedFile(null);
     setForm({
       title: item?.title || "",
       description: item?.description || "",
@@ -128,21 +162,45 @@ export default function useInstructorMaterialManagePage() {
           throw new Error("Material title is required");
         }
 
-        if (!form.fileUrl.trim()) {
-          throw new Error("File URL is required");
+        if (!editingMaterialId && !selectedFile) {
+          throw new Error("Please choose a file to upload");
         }
 
         setSaving(true);
 
+        let uploadedFileMeta = {
+          fileUrl: form.fileUrl,
+          fileName: form.fileName,
+          fileType: form.fileType,
+          fileSize: Number(form.fileSize) || 0,
+        };
+
+        if (selectedFile) {
+          setUploading(true);
+          const uploadRes = await uploadMaterialFile(selectedFile);
+          const uploadData = uploadRes?.data?.data || uploadRes?.data || uploadRes;
+
+          uploadedFileMeta = {
+            fileUrl: uploadData?.fileUrl || "",
+            fileName: uploadData?.fileName || selectedFile.name || "",
+            fileType: uploadData?.fileType || extractFileType(selectedFile),
+            fileSize: Number(uploadData?.fileSize || selectedFile.size || 0),
+          };
+        }
+
+        if (!uploadedFileMeta.fileUrl) {
+          throw new Error("Upload failed: file URL not found");
+        }
+
         const payload = {
-          ...form,
           title: form.title.trim(),
           description: form.description.trim(),
-          fileUrl: form.fileUrl.trim(),
-          fileName: form.fileName.trim(),
-          fileType: form.fileType.trim(),
-          fileSize: Number(form.fileSize) || 0,
+          fileUrl: uploadedFileMeta.fileUrl,
+          fileName: uploadedFileMeta.fileName,
+          fileType: uploadedFileMeta.fileType,
+          fileSize: Number(uploadedFileMeta.fileSize) || 0,
           lessonId: form.lessonId || "",
+          isPublished: !!form.isPublished,
           courseId,
           instructorId,
         };
@@ -170,9 +228,10 @@ export default function useInstructorMaterialManagePage() {
         });
       } finally {
         setSaving(false);
+        setUploading(false);
       }
     },
-    [courseId, editingMaterialId, form, instructorId, loadData, resetForm]
+    [courseId, editingMaterialId, form, instructorId, loadData, resetForm, selectedFile]
   );
 
   const handleDelete = useCallback(
@@ -223,14 +282,17 @@ export default function useInstructorMaterialManagePage() {
     materials,
     loading,
     saving,
+    uploading,
     deletingId,
     editingMaterialId,
+    selectedFile,
     form,
     toast,
     setToast,
     stats,
     getLessonTitle,
     handleChange,
+    handleFileChange,
     handleEdit,
     handleSubmit,
     handleDelete,

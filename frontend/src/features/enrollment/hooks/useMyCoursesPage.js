@@ -10,7 +10,7 @@ import {
 } from "../utils/enrollment.helpers";
 
 export default function useMyCoursesPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, booting } = useAuth();
 
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +22,8 @@ export default function useMyCoursesPage() {
 
   const loadMyCourses = useCallback(async () => {
     try {
+      if (booting) return;
+
       if (!isAuthenticated) {
         setCourses([]);
         setLoading(false);
@@ -29,9 +31,7 @@ export default function useMyCoursesPage() {
       }
 
       const studentId = getUserId(user);
-      if (!studentId) {
-        throw new Error("Student id not found");
-      }
+      if (!studentId) return;
 
       setLoading(true);
 
@@ -55,7 +55,7 @@ export default function useMyCoursesPage() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, user]);
+  }, [booting, isAuthenticated, user]);
 
   useEffect(() => {
     loadMyCourses();

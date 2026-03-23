@@ -42,7 +42,7 @@ export default function AssignmentList({
 
   return (
     <div className="assignment-list">
-      {items.map((item) => {
+      {items.map((item, index) => {
         const assignmentId = getAssignmentId(item);
         const submission = submissionsMap[assignmentId];
         const statusMeta = submission
@@ -54,7 +54,19 @@ export default function AssignmentList({
             <div className="assignment-list__card-layout">
               <div className="assignment-list__content">
                 <div className="assignment-list__header">
-                  <h3 className="assignment-list__title">{item.title}</h3>
+                  <div className="assignment-list__header-main">
+                    <div className="assignment-list__index">{index + 1}</div>
+
+                    <div className="assignment-list__title-group">
+                      <h3 className="assignment-list__title">
+                        {item.title || "Untitled Assignment"}
+                      </h3>
+
+                      <p className="assignment-list__description">
+                        {item.description || "Chưa có mô tả bài tập."}
+                      </p>
+                    </div>
+                  </div>
 
                   <AssignmentStatusBadge
                     label={statusMeta.label}
@@ -62,10 +74,6 @@ export default function AssignmentList({
                     small
                   />
                 </div>
-
-                <p className="assignment-list__description">
-                  {item.description || "Chưa có mô tả bài tập."}
-                </p>
 
                 <div className="assignment-list__meta-grid">
                   <div className="assignment-list__meta-card">
@@ -113,18 +121,33 @@ export default function AssignmentList({
                       <div className="assignment-list__helper-item">
                         <span className="assignment-list__helper-label">
                           Lần nộp gần nhất:
-                        </span>{" "}
-                        {getLatestSubmissionInfo(submission)}
+                        </span>
+                        <span className="assignment-list__helper-value">
+                          {getLatestSubmissionInfo(submission)}
+                        </span>
                       </div>
 
                       <div className="assignment-list__helper-item">
                         <span className="assignment-list__helper-label">
                           Feedback:
-                        </span>{" "}
-                        {submission.feedback || "Chưa có nhận xét"}
+                        </span>
+                        <span className="assignment-list__helper-value">
+                          {submission.feedback || "Chưa có nhận xét"}
+                        </span>
                       </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="assignment-list__helper-grid">
+                      <div className="assignment-list__helper-item">
+                        <span className="assignment-list__helper-label">
+                          Trạng thái:
+                        </span>
+                        <span className="assignment-list__helper-value">
+                          Chưa có bài nộp
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

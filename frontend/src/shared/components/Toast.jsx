@@ -8,8 +8,6 @@ export default function Toast({
   duration = 2600,
   position = "top-center",
 }) {
-  if (!message) return null;
-
   const toastType = type || kind || "error";
 
   useEffect(() => {
@@ -28,6 +26,8 @@ export default function Toast({
     "top-left": "top-4 left-4",
     "bottom-center": "bottom-4 left-1/2 -translate-x-1/2",
   };
+
+  if (!message) return null;
 
   return (
     <div

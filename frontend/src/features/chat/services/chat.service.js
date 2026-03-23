@@ -43,9 +43,12 @@ function createHeaders(extraHeaders = {}, useAuth = false) {
 
   if (useAuth) {
     const token = getAuthToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+    if (!token) {
+      const error = new Error("Unauthorized");
+      error.status = 401;
+      throw error;
     }
+    headers.Authorization = `Bearer ${token}`;
   }
 
   return headers;
@@ -163,6 +166,8 @@ function createSocket(token) {
 
 export function getChatSocket() {
   const token = getAuthToken();
+
+  if (!token) return null;
 
   if (!socketInstance) {
     socketInstance = createSocket(token);

@@ -17,14 +17,17 @@ export default function InstructorMaterialManagePage() {
     materials,
     loading,
     saving,
+    uploading,
     deletingId,
     editingMaterialId,
+    selectedFile,
     form,
     toast,
     setToast,
     stats,
     getLessonTitle,
     handleChange,
+    handleFileChange,
     handleEdit,
     handleSubmit,
     handleDelete,
@@ -93,7 +96,10 @@ export default function InstructorMaterialManagePage() {
             lessons={lessons}
             editingMaterialId={editingMaterialId}
             saving={saving}
+            uploading={uploading}
+            selectedFile={selectedFile}
             onChange={handleChange}
+            onFileChange={handleFileChange}
             onSubmit={handleSubmit}
             onReset={resetForm}
           />

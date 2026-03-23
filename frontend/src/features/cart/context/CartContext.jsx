@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { getMyCart, cartUnwrap } from "../services/cart.service";
-import { normalizeCart } from "../utils/cart.helpers";
+import { normalizeCart, getCartCount } from "../utils/cart.helpers";
 import { useAuth } from "../../auth/state/useAuth";
 
 const CartContext = createContext(null);
@@ -30,20 +30,34 @@ export function CartProvider({ children }) {
   }
 
   useEffect(() => {
-    if (!booting) loadCart();
+    if (!booting) {
+      loadCart();
+    }
   }, [booting, isAuthenticated]);
 
   useEffect(() => {
-    const handler = () => loadCart();
+    if (booting) return;
+
+    const handler = () => {
+      loadCart();
+    };
+
     window.addEventListener("cart-updated", handler);
     return () => window.removeEventListener("cart-updated", handler);
-  }, []);
+  }, [booting, isAuthenticated]);
 
-  return (
-    <CartContext.Provider value={{ cart, setCart, loadCart, loading }}>
-      {children}
-    </CartContext.Provider>
+  const value = useMemo(
+    () => ({
+      cart,
+      setCart,
+      loadCart,
+      loading,
+      cartCount: getCartCount(cart),
+    }),
+    [cart, loading]
   );
+
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {

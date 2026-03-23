@@ -8,6 +8,7 @@ import "../styles/learn-course-page.css";
 
 export default function LearnCoursePage() {
   const pageClassName = "learn-course-page";
+
   const {
     courseId,
     activeTab,
@@ -17,6 +18,7 @@ export default function LearnCoursePage() {
     loading,
     actionLoading,
     certificateLoading,
+    assignmentLoading,
     toast,
     setToast,
     lessons,
@@ -26,6 +28,8 @@ export default function LearnCoursePage() {
     currentLessonCompleted,
     completedCount,
     totalLessons,
+    assignments,
+    submissionsMap,
     handleChangeTab,
     handleOpenInstructorChat,
     handleSelectLesson,
@@ -105,6 +109,9 @@ export default function LearnCoursePage() {
             lessons={lessons}
             currentLesson={currentLesson}
             completedLessonIds={completedLessonIds}
+            assignments={assignments}
+            submissionsMap={submissionsMap}
+            assignmentLoading={assignmentLoading}
             pageClassName={pageClassName}
           />
         </main>

@@ -85,6 +85,9 @@ export default function LearnTabsPanel({
   lessons = [],
   currentLesson,
   completedLessonIds = [],
+  assignments = [],
+  submissionsMap = {},
+  assignmentLoading = false,
   pageClassName = "",
 }) {
   const currentLessonId = String(getLessonId(currentLesson));
@@ -133,7 +136,14 @@ export default function LearnTabsPanel({
         return <QuizList courseId={courseId} />;
 
       case "assignments":
-        return <AssignmentList courseId={courseId} />;
+        return (
+          <AssignmentList
+            items={assignments}
+            submissionsMap={submissionsMap}
+            courseId={courseId}
+            loading={assignmentLoading}
+          />
+        );
 
       case "lessons":
       default:

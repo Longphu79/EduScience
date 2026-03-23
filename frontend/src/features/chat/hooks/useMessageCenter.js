@@ -50,6 +50,7 @@ export default function useMessageCenter({
     if (!open || !isChatAllowed) return;
 
     const socket = getChatSocket();
+    if (!socket) return; // 🔥 FIX: chưa login thì không connect
 
     const handleConversationUpdated = (updatedConversation) => {
       const updatedConversationId = getConversationId(updatedConversation);

@@ -1,4 +1,4 @@
-import { request } from "../../../services/https.js";
+import request from "../../../services/https.js";
 
 export async function getUserProfile(userId) {
   return request(`/user/profile/${userId}`, {

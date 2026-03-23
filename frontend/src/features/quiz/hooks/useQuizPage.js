@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useNavigate,
   useParams,
@@ -21,6 +21,10 @@ import {
   normalizeQuizItem,
   quizUnwrap,
 } from "../utils/quiz.helpers";
+import useQuizCountdown from "./useQuizCountdown";
+import useQuizNavigationGuard, {
+  BROWSER_BACK_SENTINEL,
+} from "./useQuizNavigationGuard";
 
 function hasAnyAnswered(answers = {}) {
   return Object.values(answers).some(
@@ -38,6 +42,7 @@ export default function useQuizPage() {
   const [attempts, setAttempts] = useState([]);
   const [answers, setAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [leaveLoading, setLeaveLoading] = useState(false);
@@ -60,9 +65,15 @@ export default function useQuizPage() {
   const studentId = user?._id || user?.id || user?.userId || "";
   const forceRetake = searchParams.get("retake") === "1";
 
+  const isFinishingRef = useRef(false);
+  const didAutoSubmitRef = useRef(false);
+
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
+
+      isFinishingRef.current = false;
+      didAutoSubmitRef.current = false;
 
       const quizRes = await getQuizById(quizId, { hideAnswers: true });
       const normalizedQuiz = normalizeQuizItem(quizUnwrap(quizRes) || {});
@@ -79,6 +90,8 @@ export default function useQuizPage() {
       setReviewData(null);
       setReviewSource(null);
       setPendingNavigationPath("");
+      setLeaveConfirmOpen(false);
+      setRetryConfirmOpen(false);
 
       if (studentId && courseId) {
         try {
@@ -130,59 +143,38 @@ export default function useQuizPage() {
     return getAttemptSummary(latestAttempt, quiz);
   }, [latestAttempt, quiz]);
 
-  useEffect(() => {
-    if (timeLeft === null) return;
-    if (timeLeft <= 0) return;
-    if (submitting) return;
-    if (showReview) return;
-    if (showSubmitResult) return;
-    if (quizMode !== "taking") return;
-
-    const timer = window.setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev === null) return prev;
-        if (prev <= 1) return 0;
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => window.clearInterval(timer);
-  }, [timeLeft, submitting, showReview, showSubmitResult, quizMode]);
-
-  const handleSelectOption = useCallback((question, optionValue) => {
-    const questionId = getQuestionId(question);
-    if (!questionId) return;
-
-    setAnswers((prev) => {
-      const current = Array.isArray(prev[questionId]) ? prev[questionId] : [];
-      const questionType = question?.type || "single";
-
-      let nextValues = [];
-
-      if (questionType === "multiple") {
-        nextValues = current.includes(optionValue)
-          ? current.filter((item) => item !== optionValue)
-          : [...current, optionValue];
-      } else {
-        nextValues = [optionValue];
-      }
-
-      return {
-        ...prev,
-        [questionId]: nextValues,
-      };
-    });
-  }, []);
+  const isTakingActive = useMemo(() => {
+    return (
+      !loading &&
+      !submitting &&
+      !leaveLoading &&
+      quizMode === "taking" &&
+      !showReview &&
+      !showSubmitResult &&
+      !!quiz?._id
+    );
+  }, [
+    leaveLoading,
+    loading,
+    quiz,
+    quizMode,
+    showReview,
+    showSubmitResult,
+    submitting,
+  ]);
 
   const finishQuiz = useCallback(
     async ({
       showResultModal = true,
       successMessage = "Nộp quiz thành công",
     } = {}) => {
-      if (!quiz || submitting) return false;
+      if (!quiz?._id) return false;
+      if (isFinishingRef.current) return false;
 
       try {
+        isFinishingRef.current = true;
         setSubmitting(true);
+        setTimeLeft(0);
 
         const payloadAnswers = (quiz.questions || []).map((question) => {
           const questionId = getQuestionId(question);
@@ -214,6 +206,8 @@ export default function useQuizPage() {
         setReviewSource(null);
         setShowReview(false);
         setShowSubmitResult(showResultModal);
+        setLeaveConfirmOpen(false);
+        setPendingNavigationPath("");
 
         if (successMessage) {
           setToast({
@@ -231,9 +225,10 @@ export default function useQuizPage() {
         return false;
       } finally {
         setSubmitting(false);
+        isFinishingRef.current = false;
       }
     },
-    [answers, quiz, quizId, submitting]
+    [answers, quiz, quizId]
   );
 
   const handleSubmit = useCallback(async () => {
@@ -243,16 +238,47 @@ export default function useQuizPage() {
     });
   }, [finishQuiz]);
 
-  useEffect(() => {
-    if (timeLeft !== 0) return;
-    if (quizMode !== "taking") return;
-    if (submitting) return;
+  const handleTimeUp = useCallback(() => {
+    if (didAutoSubmitRef.current) return;
+    didAutoSubmitRef.current = true;
 
     finishQuiz({
       showResultModal: true,
       successMessage: "Hết thời gian, hệ thống đã tự nộp bài.",
     });
-  }, [finishQuiz, quizMode, submitting, timeLeft]);
+  }, [finishQuiz]);
+
+  useQuizCountdown({
+    enabled: isTakingActive,
+    timeLeft,
+    onTick: setTimeLeft,
+    onTimeUp: handleTimeUp,
+  });
+
+  const handleSelectOption = useCallback((question, optionValue) => {
+    const questionId = getQuestionId(question);
+    if (!questionId) return;
+
+    setAnswers((prev) => {
+      const current = Array.isArray(prev[questionId]) ? prev[questionId] : [];
+      const questionType = question?.type || "single";
+
+      let nextValues = [];
+
+      if (questionType === "multiple") {
+        nextValues = current.includes(optionValue)
+          ? current.filter((item) => item !== optionValue)
+          : [...current, optionValue];
+      } else {
+        nextValues = [optionValue];
+      }
+
+      return {
+        ...prev,
+        [questionId]: nextValues,
+      };
+    });
+  }, []);
 
   const handleOpenLatestReview = useCallback(
     async (source = "detail") => {
@@ -290,6 +316,9 @@ export default function useQuizPage() {
   const resetQuizState = useCallback(() => {
     if (!quiz) return;
 
+    isFinishingRef.current = false;
+    didAutoSubmitRef.current = false;
+
     setAnswers(buildInitialAnswers(quiz.questions || []));
     setTimeLeft(quiz.timeLimit > 0 ? quiz.timeLimit * 60 : null);
     setShowReview(false);
@@ -299,6 +328,7 @@ export default function useQuizPage() {
     setReviewSource(null);
     setQuizMode("taking");
     setPendingNavigationPath("");
+    setLeaveConfirmOpen(false);
   }, [quiz]);
 
   const handleRetry = useCallback(() => {
@@ -318,73 +348,76 @@ export default function useQuizPage() {
   }, [resetQuizState]);
 
   const shouldBlockNavigation = useMemo(() => {
+    if (!quiz?._id) return false;
     if (loading || submitting || leaveLoading) return false;
     if (quizMode !== "taking") return false;
     if (showReview || showSubmitResult) return false;
-    return hasAnyAnswered(answers);
+    return true;
   }, [
-    answers,
     leaveLoading,
     loading,
+    quiz,
     quizMode,
     showReview,
     showSubmitResult,
     submitting,
   ]);
 
-  useEffect(() => {
-    const handleBeforeUnload = (event) => {
-      if (!shouldBlockNavigation) return;
-      event.preventDefault();
-      event.returnValue = "";
-    };
+  const openLeaveConfirm = useCallback((nextPath = "") => {
+    setPendingNavigationPath(nextPath);
+    setLeaveConfirmOpen(true);
+  }, []);
 
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [shouldBlockNavigation]);
+  useQuizNavigationGuard({
+    enabled: shouldBlockNavigation,
+    onRequestLeave: openLeaveConfirm,
+  });
 
   const requestNavigate = useCallback(
     (nextPath) => {
       if (!nextPath) return;
 
       if (shouldBlockNavigation) {
-        setPendingNavigationPath(nextPath);
-        setLeaveConfirmOpen(true);
+        openLeaveConfirm(nextPath);
         return;
       }
 
       navigate(nextPath);
     },
-    [navigate, shouldBlockNavigation]
+    [navigate, openLeaveConfirm, shouldBlockNavigation]
   );
 
   const confirmLeave = useCallback(async () => {
     try {
       setLeaveLoading(true);
 
-      if (hasAnyAnswered(answers)) {
-        const submitted = await finishQuiz({
-          showResultModal: false,
-          successMessage: "Đã kết thúc và nộp bài hiện tại.",
-        });
+      const submitted = await finishQuiz({
+        showResultModal: false,
+        successMessage: "Đã kết thúc và nộp bài hiện tại.",
+      });
 
-        if (!submitted) {
-          return;
-        }
-      }
+      if (!submitted) return;
 
       const nextPath = pendingNavigationPath;
 
       setLeaveConfirmOpen(false);
       setPendingNavigationPath("");
 
+      if (nextPath === BROWSER_BACK_SENTINEL) {
+        navigate(-1);
+        return;
+      }
+
       if (nextPath) {
         navigate(nextPath);
+        return;
       }
+
+      navigate(`/learn/${courseId}?tab=quizzes`);
     } finally {
       setLeaveLoading(false);
     }
-  }, [answers, finishQuiz, navigate, pendingNavigationPath]);
+  }, [courseId, finishQuiz, navigate, pendingNavigationPath]);
 
   const cancelLeave = useCallback(() => {
     setLeaveConfirmOpen(false);

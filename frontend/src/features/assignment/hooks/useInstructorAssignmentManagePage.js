@@ -14,6 +14,22 @@ import {
   validateAssignmentForm,
 } from "../utils/assignment.helpers";
 
+function validateDueDateInFuture(value) {
+  if (!value) return "";
+  const dueDate = new Date(value);
+  const now = new Date();
+
+  if (Number.isNaN(dueDate.getTime())) {
+    return "Hạn nộp không hợp lệ";
+  }
+
+  if (dueDate <= now) {
+    return "Hạn nộp phải lớn hơn thời điểm hiện tại";
+  }
+
+  return "";
+}
+
 export default function useInstructorAssignmentManagePage() {
   const { courseId } = useParams();
 
@@ -94,6 +110,12 @@ export default function useInstructorAssignmentManagePage() {
     const validationError = validateAssignmentForm(form);
     if (validationError) {
       setToast({ message: validationError, kind: "error" });
+      return;
+    }
+
+    const dueDateError = validateDueDateInFuture(form.dueDate);
+    if (dueDateError) {
+      setToast({ message: dueDateError, kind: "error" });
       return;
     }
 

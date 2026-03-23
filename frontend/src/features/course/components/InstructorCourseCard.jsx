@@ -15,7 +15,9 @@ export default function InstructorCourseCard({
   const statusMeta = getStatusMeta(course);
 
   return (
-    <div className={`instructor-courses-page__course-card ${statusMeta.cardTone}`}>
+    <article
+      className={`instructor-courses-page__course-card ${statusMeta.cardTone}`}
+    >
       <div className="instructor-courses-page__course-media">
         <img
           src={getSafeImage(course.thumbnail) || getFallbackCourseImage()}
@@ -26,21 +28,19 @@ export default function InstructorCourseCard({
           }}
         />
 
+        <div className="instructor-courses-page__course-overlay" />
+
         <div className="instructor-courses-page__course-badges">
           <span className="instructor-courses-page__category-badge">
             {course.category || "General"}
           </span>
 
-          <span className={statusMeta.badgeClass}>
-            {statusMeta.label}
-          </span>
+          <span className={statusMeta.badgeClass}>{statusMeta.label}</span>
         </div>
       </div>
 
       <div className="instructor-courses-page__course-body">
-        <h3 className="instructor-courses-page__course-title">
-          {course.title}
-        </h3>
+        <h3 className="instructor-courses-page__course-title">{course.title}</h3>
 
         <p className="instructor-courses-page__course-description">
           {course.shortDescription || course.description}
@@ -50,7 +50,7 @@ export default function InstructorCourseCard({
           <div>
             <div className="instructor-courses-page__summary-label">Lessons</div>
             <div className="instructor-courses-page__summary-value">
-              {course.analytics?.totalLessons || 0}
+              {course.analytics?.totalLessons || course.totalLessons || 0}
             </div>
           </div>
 
@@ -64,29 +64,58 @@ export default function InstructorCourseCard({
           <div>
             <div className="instructor-courses-page__summary-label">Students</div>
             <div className="instructor-courses-page__summary-value">
-              {course.analytics?.totalStudents || 0}
+              {course.analytics?.totalStudents || course.totalEnrollments || 0}
             </div>
           </div>
         </div>
 
         <div className="instructor-courses-page__actions-grid">
-          <Link to={`/courses/${courseId}`} className="instructor-courses-page__primary-link">
+          <Link
+            to={`/courses/${courseId}`}
+            className="instructor-courses-page__primary-link"
+          >
             View Detail
           </Link>
 
-          <Link to={`/instructor/courses/${courseId}/edit`} className="instructor-courses-page__ghost-link-btn">
+          <Link
+            to={`/instructor/courses/${courseId}/edit`}
+            className="instructor-courses-page__ghost-link-btn"
+          >
             Edit
           </Link>
 
-          <Link to={`/instructor/courses/${courseId}/lessons`} className="instructor-courses-page__ghost-link-btn">
+          <Link
+            to={`/instructor/courses/${courseId}/lessons`}
+            className="instructor-courses-page__ghost-link-btn"
+          >
             Lessons
           </Link>
 
-          <Link to={`/instructor/courses/${courseId}/materials`} className="instructor-courses-page__ghost-link-btn">
+          <Link
+            to={`/instructor/courses/${courseId}/materials`}
+            className="instructor-courses-page__ghost-link-btn"
+          >
             Materials
           </Link>
 
-          <Link to={`/instructor/courses/${courseId}/chat`} className="instructor-courses-page__ghost-link-btn">
+          <Link
+            to={`/instructor/courses/${courseId}/quizzes`}
+            className="instructor-courses-page__ghost-link-btn"
+          >
+            Quizzes
+          </Link>
+
+          <Link
+            to={`/instructor/courses/${courseId}/assignments`}
+            className="instructor-courses-page__ghost-link-btn"
+          >
+            Assignments
+          </Link>
+
+          <Link
+            to={`/instructor/courses/${courseId}/chat`}
+            className="instructor-courses-page__ghost-link-btn"
+          >
             Chat
           </Link>
 
@@ -100,6 +129,6 @@ export default function InstructorCourseCard({
           </button>
         </div>
       </div>
-    </div>
+    </article>
   );
 }

@@ -1,5 +1,8 @@
 import Button from "../../../shared/components/Button";
 import AttachmentList from "./AttachmentList";
+import {
+  getMinDueDateTimeValue,
+} from "../utils/assignment.helpers";
 import "../styles/assignment-components.css";
 
 export default function AssignmentForm({
@@ -23,6 +26,10 @@ export default function AssignmentForm({
           <h2 className="assignment-form__title">
             {editingId ? "Edit Assignment" : "Create Assignment"}
           </h2>
+          <p className="assignment-form__subtitle">
+            Thiết lập bài tập với tiêu đề, mô tả, hạn nộp, điểm tối đa và file
+            đính kèm theo bố cục rõ ràng, hiện đại và chuyên nghiệp.
+          </p>
         </div>
 
         {editingId ? (
@@ -66,6 +73,7 @@ export default function AssignmentForm({
               type="datetime-local"
               className="assignment-form__input"
               value={form.dueDate}
+              min={getMinDueDateTimeValue()}
               onChange={(event) => onChange("dueDate", event.target.value)}
             />
           </div>
@@ -121,7 +129,9 @@ export default function AssignmentForm({
           <input
             type="file"
             multiple
-            onChange={(event) => onAddFiles(Array.from(event.target.files || []))}
+            onChange={(event) =>
+              onAddFiles(Array.from(event.target.files || []))
+            }
             className="assignment-form__file-input"
           />
 
@@ -136,8 +146,8 @@ export default function AssignmentForm({
           ) : null}
 
           <p className="assignment-form__hint">
-            Chỉ dùng upload file thật. Khi sửa assignment, bạn có thể xóa từng
-            file cũ hoặc thêm file mới.
+            Hạn nộp không được ở quá khứ. Khi sửa assignment, bạn có thể xóa file
+            cũ hoặc thêm file mới.
           </p>
         </div>
       </div>

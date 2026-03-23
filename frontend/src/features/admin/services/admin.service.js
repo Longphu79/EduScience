@@ -1,4 +1,4 @@
-import { api } from "../../../services/api";
+import api from "../../../services/api.js";
 import { adminUnwrap, buildAdminQuery } from "../utils/admin.helpers";
 
 export async function getAdminDashboard() {

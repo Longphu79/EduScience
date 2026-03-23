@@ -11,6 +11,15 @@ import {
   getCourseById,
 } from "../../course/services/course.service";
 import {
+  getAssignmentsByCourse,
+  getAssignmentSubmissionByStudentCourse,
+} from "../../assignment/services/assignment.service";
+import {
+  buildSubmissionMap,
+  normalizeAssignmentList,
+  normalizeSubmissionList,
+} from "../../assignment/utils/assignment.helpers";
+import {
   completeLesson,
   enrollmentUnwrap,
   getEnrollmentByStudentAndCourse,
@@ -38,6 +47,10 @@ export default function useLearnCoursePage() {
   const [enrollment, setEnrollment] = useState(null);
   const [currentLesson, setCurrentLessonState] = useState(null);
   const [certificate, setCertificate] = useState(null);
+
+  const [assignments, setAssignments] = useState([]);
+  const [assignmentSubmissions, setAssignmentSubmissions] = useState([]);
+  const [assignmentLoading, setAssignmentLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -94,6 +107,10 @@ export default function useLearnCoursePage() {
 
   const totalLessons = useMemo(() => lessons.length, [lessons]);
 
+  const submissionsMap = useMemo(() => {
+    return buildSubmissionMap(assignmentSubmissions);
+  }, [assignmentSubmissions]);
+
   const showToast = useCallback((message, kind = "error") => {
     setToast({ message, kind });
   }, []);
@@ -108,6 +125,8 @@ export default function useLearnCoursePage() {
     setEnrollment(null);
     setCurrentLessonState(null);
     setCertificate(null);
+    setAssignments([]);
+    setAssignmentSubmissions([]);
   }, []);
 
   const loadLearningData = useCallback(async () => {
@@ -132,13 +151,41 @@ export default function useLearnCoursePage() {
     }
 
     if (!enrollmentData?._id) {
-      throw new Error("Bạn chưa đăng ký khóa học này hoặc dữ liệu đăng ký không còn hợp lệ");
+      throw new Error(
+        "Bạn chưa đăng ký khóa học này hoặc dữ liệu đăng ký không còn hợp lệ"
+      );
     }
 
     setCourse(courseData);
     setEnrollment(enrollmentData);
     syncCurrentLesson(courseData, enrollmentData);
   }, [courseId, isAuthenticated, studentId, syncCurrentLesson]);
+
+  const loadAssignmentsData = useCallback(async () => {
+    if (!courseId || !studentId) {
+      setAssignments([]);
+      setAssignmentSubmissions([]);
+      return;
+    }
+
+    try {
+      setAssignmentLoading(true);
+
+      const [assignmentResponse, submissionResponse] = await Promise.all([
+        getAssignmentsByCourse(courseId),
+        getAssignmentSubmissionByStudentCourse(studentId, courseId),
+      ]);
+
+      setAssignments(normalizeAssignmentList(assignmentResponse));
+      setAssignmentSubmissions(normalizeSubmissionList(submissionResponse));
+    } catch (error) {
+      setAssignments([]);
+      setAssignmentSubmissions([]);
+      showToast(error?.message || "Không tải được bài tập", "error");
+    } finally {
+      setAssignmentLoading(false);
+    }
+  }, [courseId, studentId, showToast]);
 
   const loadCertificate = useCallback(async () => {
     try {
@@ -179,6 +226,12 @@ export default function useLearnCoursePage() {
   useEffect(() => {
     loadCertificate();
   }, [loadCertificate]);
+
+  useEffect(() => {
+    if (activeTab === "assignments" && courseId && studentId) {
+      loadAssignmentsData();
+    }
+  }, [activeTab, courseId, studentId, loadAssignmentsData]);
 
   const handleChangeTab = useCallback(
     (tab) => {
@@ -320,6 +373,7 @@ export default function useLearnCoursePage() {
     loading,
     actionLoading,
     certificateLoading,
+    assignmentLoading,
     toast,
     setToast,
     lessons,
@@ -329,11 +383,15 @@ export default function useLearnCoursePage() {
     currentLessonCompleted,
     completedCount,
     totalLessons,
+    assignments,
+    assignmentSubmissions,
+    submissionsMap,
     handleChangeTab,
     handleOpenInstructorChat,
     handleSelectLesson,
     handleCompleteLesson,
     handleGenerateCertificate,
     handleBackToMyCourses,
+    reloadAssignments: loadAssignmentsData,
   };
 }

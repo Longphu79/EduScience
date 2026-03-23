@@ -16,8 +16,8 @@ export default function LeaveQuizConfirmModal({
         </h2>
 
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Bạn đang làm quiz. Nếu rời trang bây giờ, hệ thống sẽ nộp bài hiện tại
-          trước khi thoát. Bạn có chắc muốn rời đi không?
+          Bạn đang làm quiz. Nếu rời trang bây giờ, hệ thống sẽ kết thúc bài kiểm
+          tra và tự động nộp kết quả hiện tại. Bạn có chắc muốn rời đi không?
         </p>
 
         <div className="mt-6 flex flex-wrap justify-end gap-3">
