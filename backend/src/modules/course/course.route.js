@@ -15,10 +15,10 @@ const router = express.Router();
 
 router.get("/slug/:slug", getCourseBySlug);
 router.get("/popular", getPopularCourses);
+router.get("/instructor/:instructorId", verifyToken, getCoursesByInstructor);
 router.get("/", getAllCourses);
 router.get("/:courseId", getCourseById);
 
-router.get("/instructor/:instructorId", verifyToken, getCoursesByInstructor);
 router.post("/", verifyToken, createCourse);
 router.put("/:courseId", verifyToken, updateCourse);
 router.delete("/:courseId", verifyToken, deleteCourse);

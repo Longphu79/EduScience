@@ -38,6 +38,10 @@ function normalizeString(value = "") {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isPastOrNow(date) {
+  return date instanceof Date && !Number.isNaN(date.getTime()) && date <= new Date();
+}
+
 export function validateCreateAssignment(req, res, next) {
   try {
     const title = normalizeString(req.body?.title);
@@ -81,6 +85,13 @@ export function validateCreateAssignment(req, res, next) {
       return sendError(res, {
         statusCode: 400,
         message: "dueDate is invalid",
+      });
+    }
+
+    if (dueDate && isPastOrNow(dueDate)) {
+      return sendError(res, {
+        statusCode: 400,
+        message: "dueDate must be in the future",
       });
     }
 
@@ -141,6 +152,13 @@ export function validateUpdateAssignment(req, res, next) {
         return sendError(res, {
           statusCode: 400,
           message: "dueDate is invalid",
+        });
+      }
+
+      if (dueDate && isPastOrNow(dueDate)) {
+        return sendError(res, {
+          statusCode: 400,
+          message: "dueDate must be in the future",
         });
       }
 

@@ -17,7 +17,6 @@ import {
 import { verifyToken } from "../../middlewares/auth.middleware.js";
 const router = express.Router();
 
-/* instructor/admin routes */
 router.get(
   "/instructor/course/:courseId",
   verifyToken,

@@ -15,6 +15,7 @@ import reviewRoute from "./modules/review/review.route.js";
 import certificateRoute from "./modules/certificate/certificate.route.js";
 import chatRoute from "./modules/chat/chat.route.js";
 import adminRoute from "./modules/admin/admin.route.js";
+import uploadRoute from "./modules/upload/upload.route.js";
 
 import { notFoundMiddleware } from "./middlewares/notFound.middleware.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
@@ -29,7 +30,6 @@ const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
 
 const corsOptions = {
   origin(origin, callback) {
-    // Cho phép Postman, server-to-server, mobile app, request không có origin
     if (!origin) {
       return callback(null, true);
     }
@@ -62,7 +62,6 @@ app.get("/", (_req, res) => {
   });
 });
 
-
 app.use("/auth", authRoute);
 app.use("/course", courseRoute);
 app.use("/user", userRoute);
@@ -76,6 +75,7 @@ app.use("/review", reviewRoute);
 app.use("/certificate", certificateRoute);
 app.use("/chat", chatRoute);
 app.use("/admin", adminRoute);
+app.use("/upload", uploadRoute);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

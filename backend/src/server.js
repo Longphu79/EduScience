@@ -1,10 +1,8 @@
+import "dotenv/config";
 import http from "http";
-import dotenv from "dotenv";
 import mongoose from "mongoose";
 import app from "./app.js";
 import { initChatSocket } from "./modules/chat/chat.socket.js";
-
-dotenv.config();
 
 const server = http.createServer(app);
 initChatSocket(server);

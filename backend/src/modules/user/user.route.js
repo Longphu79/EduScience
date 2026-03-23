@@ -14,10 +14,9 @@ import { profileUpload } from "./user.upload.js";
 
 const router = express.Router();
 
-// public profile
 router.get("/profile/:userId", getProfile);
 
-// protected
+
 router.put("/profile/:userId", verifyToken, updateProfile);
 router.put("/changepassword/:userId", verifyToken, changePassword);
 router.put("/deactivate/:userId", verifyToken, deactivateAccount);

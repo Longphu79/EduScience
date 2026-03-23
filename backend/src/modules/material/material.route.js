@@ -7,6 +7,7 @@ import {
   deleteMaterial,
 } from "./material.controller.js";
 import { verifyToken } from "../../middlewares/auth.middleware.js";
+
 const router = express.Router();
 
 router.get("/course/:courseId", getMaterialsByCourse);

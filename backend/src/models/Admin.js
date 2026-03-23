@@ -14,14 +14,6 @@ const adminSchema = new mongoose.Schema(
       required: true,
     },
 
-    // permissions: {
-    //   type: [String],
-    //   default: [
-    //     "MANAGE_USERS",
-    //     "MANAGE_COURSES",
-    //     "VIEW_REPORTS",
-    //   ],
-    // },
 
     lastLoginAt: {
       type: Date,

@@ -72,9 +72,10 @@ export const createMaterial = async (
     fileSize: Number(payload.fileSize) || 0,
     courseId: payload.courseId,
     lessonId: payload.lessonId || null,
-    instructorId: requesterRole === "admin"
-      ? payload.instructorId || course.instructorId
-      : requesterId,
+    instructorId:
+      requesterRole === "admin"
+        ? payload.instructorId || course.instructorId
+        : requesterId,
     isPublished:
       typeof payload.isPublished === "boolean" ? payload.isPublished : true,
   });
