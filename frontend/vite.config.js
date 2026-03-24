@@ -7,4 +7,13 @@ export default defineConfig({
     tailwindcss(),
     react(),
   ],
+  server: {
+    host: true, 
+    port: 5173,
+    allowedHosts: [
+      'csbooking.io.vn',
+      'www.csbooking.io.vn',
+      '54.151.183.124'
+    ]
+  }
 })
