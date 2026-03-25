@@ -1,0 +1,12 @@
+.course-reviews-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 24px 16px;
+}
+
+.course-reviews-page__container {
+  max-width: 72rem;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}

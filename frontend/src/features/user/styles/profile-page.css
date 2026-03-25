@@ -1,0 +1,12 @@
+.profile-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  padding: 24px 16px;
+}
+
+.profile-page__container {
+  max-width: 80rem;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
