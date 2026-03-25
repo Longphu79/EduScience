@@ -1,61 +1,72 @@
-import request from "../../../services/https.js";
+import axios from "axios";
 
-export async function getUserProfile(userId) {
-  return request(`/user/profile/${userId}`, {
-    method: "GET",
-  });
-}
+// 1. Khởi tạo cấu hình dùng chung
+const api = axios.create({
+    baseURL: "http://localhost:4000",
+});
 
-export async function updateUserProfile(userId, body) {
-  return request(`/user/profile/${userId}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
+// 2. Tự động đính kèm Token vào Header trước khi gửi request
+api.interceptors.request.use((config) => {
+    const token =
+        localStorage.getItem("accessToken") || localStorage.getItem("token");
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
 
-export async function updateStudentProfile(userId, body) {
-  return request(`/user/student/${userId}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
+// --- CÁC HÀM GET DỮ LIỆU ---
+export const getUserProfile = async (userId) => {
+    const res = await api.get(`/api/user/profile/${userId}`);
+    return res.data;
+};
 
-export async function updateInstructorProfile(userId, body) {
-  return request(`/user/instructor/${userId}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
+// --- CÁC HÀM UPDATE PROFILE (Dùng PUT) ---
+export const updateUserProfile = async (userId, body) => {
+    const res = await api.put(`/api/user/profile/${userId}`, body);
+    return res.data;
+};
 
-export async function changeUserPassword(userId, body) {
-  return request(`/user/changepassword/${userId}`, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
+export const updateStudentProfile = async (userId, body) => {
+    const res = await api.put(`/api/user/student/${userId}`, body);
+    return res.data;
+};
 
-export async function deactivateUser(userId) {
-  return request(`/user/deactivate/${userId}`, {
-    method: "PUT",
-  });
-}
+export const updateInstructorProfile = async (userId, body) => {
+    const res = await api.put(`/api/user/instructor/${userId}`, body);
+    return res.data;
+};
 
-export async function uploadUserAvatar(userId, file) {
-  const formData = new FormData();
-  formData.append("avatar", file);
+// --- CÁC HÀM UPLOAD FILE (Dùng POST + FormData) ---
+export const uploadUserAvatar = async (userId, file) => {
+    const formData = new FormData();
+    // Key "avatar" phải khớp với Backend profileUpload.single("avatar")
+    formData.append("avatar", file);
 
-  return request(`/user/upload/avatar/${userId}`, {
-    method: "POST",
-    body: formData,
-  });
-}
+    const res = await api.post(`/api/user/upload/avatar/${userId}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+};
 
-export async function uploadUserCover(userId, file) {
-  const formData = new FormData();
-  formData.append("cover", file);
+export const uploadUserCover = async (userId, file) => {
+    const formData = new FormData();
+    // Key "cover" phải khớp với Backend profileUpload.single("cover")
+    formData.append("cover", file);
 
-  return request(`/user/upload/cover/${userId}`, {
-    method: "POST",
-    body: formData,
-  });
-}
+    const res = await api.post(`/api/user/upload/cover/${userId}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+};
+
+// --- CÁC HÀM KHÁC ---
+export const changeUserPassword = async (userId, body) => {
+    const res = await api.put(`/api/user/changepassword/${userId}`, body);
+    return res.data;
+};
+
+export const deactivateUser = async (userId) => {
+    const res = await api.put(`/api/user/deactivate/${userId}`);
+    return res.data;
+};

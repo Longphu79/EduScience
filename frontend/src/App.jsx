@@ -1,9 +1,9 @@
 import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  Outlet,
+    BrowserRouter,
+    Routes,
+    Route,
+    Navigate,
+    Outlet,
 } from "react-router-dom";
 import { MainLayout } from "./layouts/MainLayout";
 
@@ -58,201 +58,252 @@ import CourseReviewsPage from "./features/review/pages/CourseReviewsPage";
 
 import FeaturesPage from "./pages/features/Features";
 import AboutPage from "./pages/aboutus/about";
+import CheckoutPage from "./features/checkout/pages/CheckoutPage";
 
 import { useAuth } from "./features/auth/state/useAuth";
 
 function LoadingScreen() {
-  return (
-    <div className="mx-auto max-w-7xl px-4 py-10">
-      <p>Loading...</p>
-    </div>
-  );
+    return (
+        <div className="mx-auto max-w-7xl px-4 py-10">
+            <p>Loading...</p>
+        </div>
+    );
 }
 
 function RequireAuth() {
-  const { isAuthenticated, token, user, booting } = useAuth();
+    const { isAuthenticated, token, user, booting } = useAuth();
 
-  if (booting) {
-    return <LoadingScreen />;
-  }
+    if (booting) {
+        return <LoadingScreen />;
+    }
 
-  if (!isAuthenticated || !token || !user) {
-    return <Navigate to="/auth/login" replace />;
-  }
+    if (!isAuthenticated || !token || !user) {
+        return <Navigate to="/auth/login" replace />;
+    }
 
-  return <Outlet />;
+    return <Outlet />;
 }
 
 function RequireRole({ allowRoles = [] }) {
-  const { isAuthenticated, token, user, booting } = useAuth();
+    const { isAuthenticated, token, user, booting } = useAuth();
 
-  if (booting) {
-    return <LoadingScreen />;
-  }
+    if (booting) {
+        return <LoadingScreen />;
+    }
 
-  if (!isAuthenticated || !token || !user) {
-    return <Navigate to="/auth/login" replace />;
-  }
+    if (!isAuthenticated || !token || !user) {
+        return <Navigate to="/auth/login" replace />;
+    }
 
-  if (allowRoles.length > 0 && !allowRoles.includes(user?.role)) {
-    return <Navigate to="/" replace />;
-  }
+    if (allowRoles.length > 0 && !allowRoles.includes(user?.role)) {
+        return <Navigate to="/" replace />;
+    }
 
-  return <Outlet />;
+    return <Outlet />;
 }
 
 function PublicOnlyRoute() {
-  const { isAuthenticated, token, user, booting } = useAuth();
+    const { isAuthenticated, token, user, booting } = useAuth();
 
-  if (booting) {
-    return <LoadingScreen />;
-  }
+    if (booting) {
+        return <LoadingScreen />;
+    }
 
-  if (isAuthenticated && token && user) {
-    return <Navigate to="/" replace />;
-  }
+    if (isAuthenticated && token && user) {
+        return <Navigate to="/" replace />;
+    }
 
-  return <Outlet />;
+    return <Outlet />;
 }
 
 function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Home />} />
+    return (
+        <BrowserRouter>
+            <Routes>
+                <Route path="/" element={<MainLayout />}>
+                    <Route index element={<Home />} />
 
-          <Route path="features" element={<FeaturesPage />} />
-          <Route path="about" element={<AboutPage />} />
-          <Route path="aboutus" element={<AboutPage />} />
+                    <Route path="features" element={<FeaturesPage />} />
+                    <Route path="about" element={<AboutPage />} />
+                    <Route path="aboutus" element={<AboutPage />} />
 
-          <Route path="courses" element={<AllCoursesPage />} />
-          <Route path="courses/:courseId" element={<CourseDetailPage />} />
-          <Route path="courses/:courseId/reviews" element={<CourseReviewsPage />} />
-          <Route path="users/:userId" element={<UserProfilePage />} />
+                    <Route path="courses" element={<AllCoursesPage />} />
+                    <Route
+                        path="courses/:courseId"
+                        element={<CourseDetailPage />}
+                    />
+                    <Route
+                        path="courses/:courseId/reviews"
+                        element={<CourseReviewsPage />}
+                    />
+                    <Route path="users/:userId" element={<UserProfilePage />} />
 
-          <Route path="certificate/:code" element={<PublicCertificatePage />} />
-          <Route
-            path="certificate/public/:code"
-            element={<PublicCertificatePage />}
-          />
+                    <Route
+                        path="certificate/:code"
+                        element={<PublicCertificatePage />}
+                    />
+                    <Route
+                        path="certificate/public/:code"
+                        element={<PublicCertificatePage />}
+                    />
 
-          <Route element={<RequireAuth />}>
-            <Route path="profile" element={<ProfilePage />} />
-            <Route path="profile/edit" element={<EditProfilePage />} />
-            <Route
-              path="profile/change-password"
-              element={<ChangePasswordPage />}
-            />
+                    <Route element={<RequireAuth />}>
+                        <Route path="profile" element={<ProfilePage />} />
+                        <Route
+                            path="profile/edit"
+                            element={<EditProfilePage />}
+                        />
+                        <Route
+                            path="profile/change-password"
+                            element={<ChangePasswordPage />}
+                        />
 
-            <Route path="cart" element={<CartPage />} />
+                        <Route path="cart" element={<CartPage />} />
 
-            <Route path="courses/:courseId/materials" element={<CourseMaterialsPage />} />
-            <Route path="courses/:courseId/chat" element={<CourseChatPage />} />
-          </Route>
+                        <Route
+                            path="courses/:courseId/materials"
+                            element={<CourseMaterialsPage />}
+                        />
+                        <Route
+                            path="courses/:courseId/chat"
+                            element={<CourseChatPage />}
+                        />
+                    </Route>
 
-          <Route element={<RequireRole allowRoles={["student"]} />}>
-            <Route path="my-courses" element={<MyCoursesPage />} />
-            <Route path="dashboard/student" element={<StudentDashboardPage />} />
+                    <Route element={<RequireRole allowRoles={["student"]} />}>
+                        <Route path="my-courses" element={<MyCoursesPage />} />
+                        <Route
+                            path="dashboard/student"
+                            element={<StudentDashboardPage />}
+                        />
 
-            <Route path="learn/:courseId" element={<LearnCoursePage />} />
-            <Route
-              path="learn/:courseId/quizzes/:quizId"
-              element={<QuizPage />}
-            />
-            <Route
-              path="learn/:courseId/assignments/:assignmentId"
-              element={<AssignmentPage />}
-            />
-            <Route path="learn/:courseId/chat" element={<CourseChatPage />} />
-            <Route
-              path="learn/:courseId/certificate"
-              element={<CourseCertificatePage />}
-            />
-          </Route>
+                        <Route
+                            path="learn/:courseId"
+                            element={<LearnCoursePage />}
+                        />
+                        <Route
+                            path="learn/:courseId/quizzes/:quizId"
+                            element={<QuizPage />}
+                        />
+                        <Route
+                            path="learn/:courseId/assignments/:assignmentId"
+                            element={<AssignmentPage />}
+                        />
+                        <Route
+                            path="learn/:courseId/chat"
+                            element={<CourseChatPage />}
+                        />
+                        <Route
+                            path="learn/:courseId/certificate"
+                            element={<CourseCertificatePage />}
+                        />
+                        <Route
+                            path="/checkout/:orderId"
+                            element={<CheckoutPage />}
+                        />
+                    </Route>
 
-          <Route element={<RequireRole allowRoles={["instructor", "admin"]} />}>
-            <Route
-              path="dashboard/instructor"
-              element={<InstructorDashboardPage />}
-            />
+                    <Route
+                        element={
+                            <RequireRole allowRoles={["instructor", "admin"]} />
+                        }
+                    >
+                        <Route
+                            path="dashboard/instructor"
+                            element={<InstructorDashboardPage />}
+                        />
 
-            <Route path="instructor/courses" element={<InstructorCoursesPage />} />
-            <Route
-              path="instructor/courses/create"
-              element={<CreateCoursePage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/edit"
-              element={<EditCoursePage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/lessons"
-              element={<InstructorLessonManagePage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/materials"
-              element={<InstructorMaterialManagePage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/quizzes"
-              element={<InstructorQuizManagePage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/quizzes/create"
-              element={<InstructorQuizCreatePage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/quizzes/:quizId/edit"
-              element={<InstructorQuizEditPage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/quizzes/:quizId/results"
-              element={<InstructorQuizResultsPage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/assignments"
-              element={<InstructorAssignmentManagePage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/assignments/:assignmentId/results"
-              element={<InstructorAssignmentResultsPage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/students"
-              element={<InstructorStudentsPage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/students/:studentId"
-              element={<InstructorStudentDetailPage />}
-            />
-            <Route
-              path="instructor/courses/:courseId/chat"
-              element={<CourseChatPage />}
-            />
-          </Route>
+                        <Route
+                            path="instructor/courses"
+                            element={<InstructorCoursesPage />}
+                        />
+                        <Route
+                            path="instructor/courses/create"
+                            element={<CreateCoursePage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/edit"
+                            element={<EditCoursePage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/lessons"
+                            element={<InstructorLessonManagePage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/materials"
+                            element={<InstructorMaterialManagePage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/quizzes"
+                            element={<InstructorQuizManagePage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/quizzes/create"
+                            element={<InstructorQuizCreatePage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/quizzes/:quizId/edit"
+                            element={<InstructorQuizEditPage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/quizzes/:quizId/results"
+                            element={<InstructorQuizResultsPage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/assignments"
+                            element={<InstructorAssignmentManagePage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/assignments/:assignmentId/results"
+                            element={<InstructorAssignmentResultsPage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/students"
+                            element={<InstructorStudentsPage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/students/:studentId"
+                            element={<InstructorStudentDetailPage />}
+                        />
+                        <Route
+                            path="instructor/courses/:courseId/chat"
+                            element={<CourseChatPage />}
+                        />
+                    </Route>
 
-          <Route element={<RequireRole allowRoles={["admin"]} />}>
-            <Route path="admin/dashboard" element={<AdminDashboardPage />} />
-            <Route path="admin/users" element={<AdminUsersPage />} />
-            <Route path="admin/users/:userId" element={<AdminUserDetailPage />} />
-            <Route path="admin/courses" element={<AdminCoursesPage />} />
-            <Route
-              path="admin/courses/:courseId"
-              element={<AdminCourseDetailPage />}
-            />
-          </Route>
-        </Route>
+                    <Route element={<RequireRole allowRoles={["admin"]} />}>
+                        <Route
+                            path="admin/dashboard"
+                            element={<AdminDashboardPage />}
+                        />
+                        <Route
+                            path="admin/users"
+                            element={<AdminUsersPage />}
+                        />
+                        <Route
+                            path="admin/users/:userId"
+                            element={<AdminUserDetailPage />}
+                        />
+                        <Route
+                            path="admin/courses"
+                            element={<AdminCoursesPage />}
+                        />
+                        <Route
+                            path="admin/courses/:courseId"
+                            element={<AdminCourseDetailPage />}
+                        />
+                    </Route>
+                </Route>
 
-        <Route element={<PublicOnlyRoute />}>
-          <Route path="/auth/login" element={<Login />} />
-          <Route path="/auth/register" element={<Register />} />
-        </Route>
+                <Route element={<PublicOnlyRoute />}>
+                    <Route path="/auth/login" element={<Login />} />
+                    <Route path="/auth/register" element={<Register />} />
+                </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
-  );
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+        </BrowserRouter>
+    );
 }
 
 export default App;
