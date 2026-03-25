@@ -23,7 +23,7 @@ import { sendSuccess } from "./utils/response.js";
 
 const app = express();
 
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173" || "https://csbooking.io.vn/")
   .split(",")
   .map((item) => item.trim())
   .filter(Boolean);
@@ -62,7 +62,7 @@ app.get("/", (_req, res) => {
   });
 });
 
-app.use("/auth", authRoute);
+app.use("/api/auth", authRoute);
 app.use("/course", courseRoute);
 app.use("/user", userRoute);
 app.use("/api/cart", cartRoute);
