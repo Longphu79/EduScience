@@ -9,6 +9,8 @@ import { MainLayout } from "./layouts/MainLayout";
 
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 import Home from "./pages/home/home";
 
 import AllCoursesPage from "./features/course/pages/AllCoursesPage";
@@ -298,6 +300,14 @@ function App() {
                 <Route element={<PublicOnlyRoute />}>
                     <Route path="/auth/login" element={<Login />} />
                     <Route path="/auth/register" element={<Register />} />
+                    <Route
+                        path="/auth/forgot-password"
+                        element={<ForgotPassword />}
+                    />
+                    <Route
+                        path="/auth/reset-password"
+                        element={<ResetPassword />}
+                    />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

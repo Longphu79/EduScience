@@ -17,3 +17,13 @@ export const registerApi = async (payload) => {
     });
     return response?.data;
 };
+
+export const forgotPasswordApi = async (payload) => {
+    const response = await request.post("/api/auth/forgot-password", payload);
+    return response.data?.data;
+};
+
+export const resetPasswordApi = async (payload) => {
+    const response = await request.post("/api/auth/reset-password", payload);
+    return response.data?.data;
+};

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthShell from "../../features/auth/components/AuthShell.jsx";
 import TextField from "../../shared/components/TextField.jsx";
 import Button from "../../shared/components/Button.jsx";
@@ -10,33 +10,54 @@ import "../../shared/styles/controls.css";
 export default function Login() {
     const { login } = useAuth();
     const nav = useNavigate();
+    const location = useLocation();
 
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
     const [toast, setToast] = useState("");
+    const [toastType, setToastType] = useState("error");
+    const [submitted, setSubmitted] = useState(false);
+
+    useEffect(() => {
+        if (location.state?.toast) {
+            setToast(location.state.toast);
+            setToastType(location.state.toastType || "success");
+            nav(location.pathname, { replace: true, state: {} });
+        }
+    }, [location.state, location.pathname, nav]);
 
     const errors = useMemo(() => {
         const e = {};
+
+        if (!submitted) return e;
+
         if (!username.trim()) e.username = "Please enter your username";
         if (!password) e.password = "Please enter your password";
-        return e;
-    }, [username, password]);
 
-    const canSubmit = Object.keys(errors).length === 0 && !loading;
+        return e;
+    }, [username, password, submitted]);
+
+    const canSubmit = username.trim() && password && !loading;
 
     const onSubmit = async (ev) => {
         ev.preventDefault();
+        setSubmitted(true);
+
         if (!canSubmit) return;
 
         setLoading(true);
         setToast("");
+
         try {
             await login({ username: username.trim(), password });
             nav("/");
         } catch (err) {
-            setToast(err?.message || "Login failed");
+            setToastType("error");
+            setToast(
+                err?.response?.data?.message || err?.message || "Login failed",
+            );
         } finally {
             setLoading(false);
         }
@@ -55,7 +76,13 @@ export default function Login() {
                 </div>
             }
         >
-            <Toast message={toast} onClose={() => setToast("")} />
+            <Toast
+                message={toast}
+                onClose={() => setToast("")}
+                kind={toastType}
+                position="inline"
+            />
+
             <form className="form" onSubmit={onSubmit}>
                 <TextField
                     label="Username"
@@ -63,7 +90,7 @@ export default function Login() {
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="e.g. cuong.dev"
                     autoComplete="username"
-                    error={username.trim() ? "" : errors.username}
+                    error={errors.username || ""}
                 />
 
                 <TextField
@@ -73,7 +100,7 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Your password"
                     autoComplete="current-password"
-                    error={password ? "" : errors.password}
+                    error={errors.password || ""}
                     right={
                         <button
                             type="button"
@@ -90,27 +117,14 @@ export default function Login() {
                         <input id="remember" type="checkbox" />
                         <label htmlFor="remember">Remember me</label>
                     </div>
-                    <a className="link" href="#">
+
+                    <Link className="link" to="/auth/forgot-password">
                         Forgot password?
-                    </a>
+                    </Link>
                 </div>
 
                 <Button type="submit" loading={loading} disabled={!canSubmit}>
                     Sign In
-                </Button>
-
-                <div className="divider">
-                    <span>or</span>
-                </div>
-
-                <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() =>
-                        setToast("Social login is not configured yet")
-                    }
-                >
-                    Continue with Google
                 </Button>
             </form>
         </AuthShell>
