@@ -40,6 +40,7 @@ export default function AllCoursesPage() {
       <Toast
         kind={toast.kind}
         message={toast.message}
+        position="bottom-center"
         onClose={() => setToast({ message: "", kind: "success" })}
       />
 

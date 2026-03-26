@@ -22,6 +22,7 @@ export default function CreateCoursePage() {
         <Toast
           kind={toast.kind}
           message={toast.message}
+          position="bottom-center"
           onClose={() => setToast({ message: "", kind: "success" })}
         />
       ) : null}

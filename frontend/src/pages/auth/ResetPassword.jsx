@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthShell from "../../features/auth/components/AuthShell.jsx";
 import TextField from "../../shared/components/TextField.jsx";
 import Button from "../../shared/components/Button.jsx";
@@ -7,18 +7,17 @@ import Toast from "../../shared/components/Toast.jsx";
 import { useAuth } from "../../features/auth/state/useAuth.jsx";
 import "../../shared/styles/controls.css";
 
-export default function Register() {
-  const { register } = useAuth();
-  const nav = useNavigate();
+export default function ResetPassword() {
+  const { resetPassword } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("student");
+  const token = useMemo(() => searchParams.get("token") || "", [searchParams]);
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState("");
   const [toastType, setToastType] = useState("error");
@@ -29,34 +28,24 @@ export default function Register() {
 
     if (!submitted) return e;
 
-    if (!username.trim()) e.username = "Please enter a username";
-
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      e.email = "Email is not valid";
-    }
-
-    if (!password) e.password = "Please enter a password";
+    if (!token) e.token = "Reset token is missing";
+    if (!password) e.password = "Please enter a new password";
     if (password && password.length < 6) {
       e.password = "Password must be at least 6 characters";
     }
-
     if (!confirmPassword) e.confirmPassword = "Please confirm your password";
     if (password && confirmPassword && password !== confirmPassword) {
       e.confirmPassword = "Passwords do not match";
     }
 
-    if (!role) e.role = "Please choose a role";
-
     return e;
-  }, [username, email, password, confirmPassword, role, submitted]);
+  }, [token, password, confirmPassword, submitted]);
 
   const canSubmit =
-    username.trim() &&
-    (!email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) &&
+    !!token &&
     password.length >= 6 &&
     confirmPassword.length > 0 &&
     password === confirmPassword &&
-    !!role &&
     !loading;
 
   const onSubmit = async (ev) => {
@@ -69,26 +58,19 @@ export default function Register() {
     setToast("");
 
     try {
-      await register({
-        username: username.trim(),
-        email: email.trim() ? email.trim() : undefined,
-        password,
-        role,
-      });
+      const result = await resetPassword({ token, password });
+      setToastType("success");
+      setToast(result?.message || "Password reset successfully");
 
-      nav("/auth/login", {
-        replace: true,
-        state: {
-          toast: "Register successfully. Please sign in.",
-          toastType: "success",
-        },
-      });
+      setTimeout(() => {
+        navigate("/auth/login");
+      }, 1200);
     } catch (err) {
       setToastType("error");
       setToast(
         err?.response?.data?.message ||
           err?.message ||
-          "Register failed"
+          "Reset password failed"
       );
     } finally {
       setLoading(false);
@@ -97,13 +79,13 @@ export default function Register() {
 
   return (
     <AuthShell
-      title="Create account"
-      subtitle="Join EduScience in seconds."
+      title="Reset password"
+      subtitle="Enter your new password."
       footer={
         <div className="foot__row">
-          <span className="muted">Already have an account?</span>
+          <span className="muted">Want to sign in instead?</span>
           <Link className="link" to="/auth/login">
-            Sign in
+            Back to sign in
           </Link>
         </div>
       }
@@ -117,54 +99,13 @@ export default function Register() {
 
       <form className="form" onSubmit={onSubmit}>
         <TextField
-          label="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          placeholder="e.g. cuong.dev"
-          autoComplete="username"
-          error={errors.username || ""}
-        />
-
-        <TextField
-          label="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          autoComplete="email"
-          error={errors.email || ""}
-        />
-
-        <div className="field">
-          <label className="field__label">Role</label>
-          <div className={`seg ${errors.role ? "is-error" : ""}`}>
-            <button
-              type="button"
-              className={`seg__btn ${role === "student" ? "is-active" : ""}`}
-              onClick={() => setRole("student")}
-            >
-              Student
-            </button>
-
-            <button
-              type="button"
-              className={`seg__btn ${role === "instructor" ? "is-active" : ""}`}
-              onClick={() => setRole("instructor")}
-            >
-              Instructor
-            </button>
-          </div>
-
-          {errors.role ? <div className="field__error">{errors.role}</div> : null}
-        </div>
-
-        <TextField
-          label="Password"
+          label="New password"
           type={showPass ? "text" : "password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="At least 6 characters"
           autoComplete="new-password"
-          error={errors.password || ""}
+          error={errors.password || errors.token || ""}
           right={
             <button
               type="button"
@@ -181,7 +122,7 @@ export default function Register() {
           type={showConfirmPass ? "text" : "password"}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="Re-enter your password"
+          placeholder="Re-enter your new password"
           autoComplete="new-password"
           error={errors.confirmPassword || ""}
           right={
@@ -195,12 +136,8 @@ export default function Register() {
           }
         />
 
-        <div className="small muted">
-          By continuing, you agree to our Terms and acknowledge our Privacy Policy.
-        </div>
-
         <Button type="submit" loading={loading} disabled={!canSubmit}>
-          Create Account
+          Reset password
         </Button>
       </form>
     </AuthShell>

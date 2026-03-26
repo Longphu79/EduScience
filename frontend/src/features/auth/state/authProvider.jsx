@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { AuthContext } from "./AuthContext";
-import { loginApi, registerApi } from "../api/authApi.js";
+import {
+  loginApi,
+  registerApi,
+  forgotPasswordApi,
+  resetPasswordApi,
+} from "../api/authApi.js";
 
 export default function AuthProvider({ children }) {
   const [token, setToken] = useState(null);
@@ -11,7 +16,6 @@ export default function AuthProvider({ children }) {
     try {
       const storedToken = localStorage.getItem("token");
       const storedUser = localStorage.getItem("user");
-
       const parsedUser = storedUser ? JSON.parse(storedUser) : null;
 
       if (storedToken && parsedUser) {
@@ -61,6 +65,14 @@ export default function AuthProvider({ children }) {
     return data;
   };
 
+  const forgotPassword = async ({ email }) => {
+    return forgotPasswordApi({ email });
+  };
+
+  const resetPassword = async ({ token, password }) => {
+    return resetPasswordApi({ token, password });
+  };
+
   const updateCurrentUser = (nextUser) => {
     if (!nextUser) return;
     setUser(nextUser);
@@ -93,6 +105,8 @@ export default function AuthProvider({ children }) {
       login,
       register,
       logout,
+      forgotPassword,
+      resetPassword,
       updateCurrentUser,
       mergeCurrentUser,
     }),

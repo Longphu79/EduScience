@@ -31,7 +31,9 @@ export default function InstructorCoursesPage() {
     return (
       <div className="instructor-courses-page">
         <Toast
-          {...toast}
+          kind={toast.kind}
+          message={toast.message}
+          position="action-zone"
           onClose={() => setToast({ message: "", kind: "success" })}
         />
 
@@ -43,8 +45,8 @@ export default function InstructorCoursesPage() {
             Instructor Courses
           </h1>
           <p className="instructor-courses-page__auth-text">
-            Please login to manage your course catalog, lessons, materials, quizzes,
-            and learner interactions.
+            Please login to manage your course catalog, lessons, materials,
+            quizzes, and learner interactions.
           </p>
 
           <div className="instructor-courses-page__auth-actions">
@@ -58,7 +60,9 @@ export default function InstructorCoursesPage() {
   return (
     <div className="instructor-courses-page">
       <Toast
-        {...toast}
+        kind={toast.kind}
+        message={toast.message}
+        position="action-zone"
         onClose={() => setToast({ message: "", kind: "success" })}
       />
 
@@ -124,54 +128,35 @@ export default function InstructorCoursesPage() {
               className="instructor-courses-page__input"
             >
               <option value="latest">Latest</option>
-              <option value="students">Students</option>
-              <option value="title">Title</option>
+              <option value="students">Most students</option>
+              <option value="progress">Best progress</option>
+              <option value="title">Title A-Z</option>
             </select>
           </div>
         </div>
       </section>
 
       {loading ? (
-        <div className="instructor-courses-page__skeleton-grid">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="instructor-courses-page__skeleton-card">
-              <div className="instructor-courses-page__skeleton-image" />
-              <div className="instructor-courses-page__skeleton-body">
-                <div className="instructor-courses-page__skeleton-line instructor-courses-page__skeleton-line--sm" />
-                <div className="instructor-courses-page__skeleton-line instructor-courses-page__skeleton-line--lg" />
-                <div className="instructor-courses-page__skeleton-line instructor-courses-page__skeleton-line--md" />
-                <div className="instructor-courses-page__skeleton-line" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : !filteredCourses.length ? (
-        <div className="instructor-courses-page__empty-card">
-          <h2 className="instructor-courses-page__empty-title">
-            No courses found
-          </h2>
-          <p className="instructor-courses-page__empty-text">
-            Try another keyword or create your first course to get started.
-          </p>
-
-          <div className="instructor-courses-page__empty-actions">
-            <Link to="/instructor/courses/create">
-              <Button>Create Course</Button>
-            </Link>
-          </div>
-        </div>
+        <section className="instructor-courses-page__empty-card">
+          <h3>Loading your courses...</h3>
+        </section>
+      ) : filteredCourses.length === 0 ? (
+        <section className="instructor-courses-page__empty-card">
+          <h3>No courses found</h3>
+          <p>Try another keyword or create a new course to get started.</p>
+        </section>
       ) : (
-        <div className="instructor-courses-page__courses-grid">
+        <section className="instructor-courses-page__course-grid">
           {filteredCourses.map((course) => (
             <InstructorCourseCard
-              key={course._id}
+              key={course._id || course.id}
               course={course}
               deletingId={deletingId}
               onDelete={handleDeleteCourse}
               getStatusMeta={getCourseStatusMeta}
             />
           ))}
-        </div>
+        </section>
       )}
     </div>
   );

@@ -9,6 +9,8 @@ import { MainLayout } from "./layouts/MainLayout";
 
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
 import Home from "./pages/home/home";
 
 import AllCoursesPage from "./features/course/pages/AllCoursesPage";
@@ -128,7 +130,10 @@ function App() {
 
           <Route path="courses" element={<AllCoursesPage />} />
           <Route path="courses/:courseId" element={<CourseDetailPage />} />
-          <Route path="courses/:courseId/reviews" element={<CourseReviewsPage />} />
+          <Route
+            path="courses/:courseId/reviews"
+            element={<CourseReviewsPage />}
+          />
           <Route path="users/:userId" element={<UserProfilePage />} />
 
           <Route path="certificate/:code" element={<PublicCertificatePage />} />
@@ -147,7 +152,10 @@ function App() {
 
             <Route path="cart" element={<CartPage />} />
 
-            <Route path="courses/:courseId/materials" element={<CourseMaterialsPage />} />
+            <Route
+              path="courses/:courseId/materials"
+              element={<CourseMaterialsPage />}
+            />
             <Route path="courses/:courseId/chat" element={<CourseChatPage />} />
           </Route>
 
@@ -177,7 +185,10 @@ function App() {
               element={<InstructorDashboardPage />}
             />
 
-            <Route path="instructor/courses" element={<InstructorCoursesPage />} />
+            <Route
+              path="instructor/courses"
+              element={<InstructorCoursesPage />}
+            />
             <Route
               path="instructor/courses/create"
               element={<CreateCoursePage />}
@@ -247,6 +258,8 @@ function App() {
         <Route element={<PublicOnlyRoute />}>
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/register" element={<Register />} />
+          <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

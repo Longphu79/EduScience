@@ -26,11 +26,11 @@ export default function InstructorCoursesStats({ dashboard, formatNumber }) {
         <div key={i} className="instructor-courses-page__stat-card">
           <div className="instructor-courses-page__stat-label">{item.label}</div>
           <div className="instructor-courses-page__stat-value">{item.value}</div>
-          {item.subtitle && (
+          {item.subtitle ? (
             <div className="instructor-courses-page__stat-subtitle">
               {item.subtitle}
             </div>
-          )}
+          ) : null}
         </div>
       ))}
     </div>
