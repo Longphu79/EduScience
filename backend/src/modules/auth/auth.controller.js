@@ -45,3 +45,42 @@ export const login = async (req, res) => {
     });
   }
 };
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const result = await authService.forgotPassword({ email });
+
+    return sendSuccess(res, {
+      message: result.message,
+      data: result,
+    });
+  } catch (err) {
+    return sendError(res, {
+      statusCode: 400,
+      message: err.message || "Forgot password failed",
+    });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    const result = await authService.resetPassword({
+      token,
+      password,
+    });
+
+    return sendSuccess(res, {
+      message: result.message,
+      data: result,
+    });
+  } catch (err) {
+    return sendError(res, {
+      statusCode: 400,
+      message: err.message || "Reset password failed",
+    });
+  }
+};
