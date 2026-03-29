@@ -1,31 +1,64 @@
 import mongoose from "mongoose";
 import * as adminService from "./admin.service.js";
+import { buildAdminDashboardPdf } from "../../utils/report.util.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 export const getDashboard = async (req, res) => {
   try {
-    const [stats, recentUsers, recentCourses, topCourses] = await Promise.all([
-      adminService.getDashboardStats(),
-      adminService.getRecentUsers(5),
-      adminService.getRecentCourses(5),
-      adminService.getTopCourses(5),
-    ]);
+    const { from = "", to = "" } = req.query;
+    const data = await adminService.getDashboardOverview({ from, to });
 
     return sendSuccess(res, {
       message: "Get admin dashboard successfully",
-      data: {
-        stats,
-        recentUsers,
-        recentCourses,
-        topCourses,
-      },
+      data,
     });
   } catch (error) {
     return sendError(res, {
       statusCode: 500,
       message: error.message || "Failed to load admin dashboard",
+    });
+  }
+};
+
+export const exportDashboardCsv = async (req, res) => {
+  try {
+    const { from = "", to = "" } = req.query;
+    const csv = await adminService.getDashboardCsv({ from, to });
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="admin-dashboard-report.csv"'
+    );
+
+    return res.status(200).send(csv);
+  } catch (error) {
+    return sendError(res, {
+      statusCode: 500,
+      message: error.message || "Failed to export admin dashboard csv",
+    });
+  }
+};
+
+export const exportDashboardPdf = async (req, res) => {
+  try {
+    const { from = "", to = "" } = req.query;
+    const dashboard = await adminService.getDashboardOverview({ from, to });
+    const pdfBuffer = await buildAdminDashboardPdf(dashboard);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="admin-dashboard-report.pdf"'
+    );
+
+    return res.status(200).send(pdfBuffer);
+  } catch (error) {
+    return sendError(res, {
+      statusCode: 500,
+      message: error.message || "Failed to export admin dashboard pdf",
     });
   }
 };

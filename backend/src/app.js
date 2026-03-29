@@ -40,7 +40,7 @@ const corsOptions = {
 
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
-  credentials: true,
+  credentials: true, 
   optionsSuccessStatus: 200,
 };
 

@@ -10,6 +10,8 @@ import {
   getStudentProgressDetail,
   getStudentDashboardSummary,
   getInstructorDashboardSummary,
+  exportInstructorDashboardCsv,
+  exportInstructorDashboardPdf,
 } from "./enrollment.controller.js";
 import { verifyToken } from "../../middlewares/auth.middleware.js";
 
@@ -22,6 +24,16 @@ router.get(
   "/dashboard/instructor/:instructorId",
   verifyToken,
   getInstructorDashboardSummary
+);
+router.get(
+  "/dashboard/instructor/:instructorId/export/csv",
+  verifyToken,
+  exportInstructorDashboardCsv
+);
+router.get(
+  "/dashboard/instructor/:instructorId/export/pdf",
+  verifyToken,
+  exportInstructorDashboardPdf
 );
 
 router.get("/student/:studentId", verifyToken, getMyCourses);

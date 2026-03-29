@@ -6,6 +6,7 @@ import Assignment from "../assignment/assignment.model.js";
 import AssignmentSubmission from "../assignment/assignmentSubmission.model.js";
 import Certificate from "../certificate/certificate.model.js";
 import ChatConversation from "../chat/chatConversation.model.js";
+import Material from "../material/material.model.js";
 
 const lessonPopulateConfig = {
   path: "lessonIds",
@@ -30,6 +31,79 @@ function calcProgress(totalLessons, completedLessonsCount) {
       (Number(completedLessonsCount || 0) / Number(totalLessons)) * 100
     )
   );
+}
+
+function normalizeDateRange({ from, to } = {}) {
+  const range = {};
+
+  if (from) {
+    const fromDate = new Date(from);
+    if (!Number.isNaN(fromDate.getTime())) {
+      fromDate.setHours(0, 0, 0, 0);
+      range.$gte = fromDate;
+    }
+  }
+
+  if (to) {
+    const toDate = new Date(to);
+    if (!Number.isNaN(toDate.getTime())) {
+      toDate.setHours(23, 59, 59, 999);
+      range.$lte = toDate;
+    }
+  }
+
+  return Object.keys(range).length ? range : null;
+}
+
+function getMonthKey(dateValue) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function buildRecentMonthBuckets(monthCount = 6, endDate = null) {
+  const base = endDate ? new Date(endDate) : new Date();
+  const now = Number.isNaN(base.getTime()) ? new Date() : base;
+  const buckets = [];
+
+  for (let i = monthCount - 1; i >= 0; i -= 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    buckets.push({
+      key: `${year}-${month}`,
+      label: `${month}/${year}`,
+      enrollments: 0,
+      quizAttempts: 0,
+      submissions: 0,
+    });
+  }
+
+  return buckets;
+}
+
+function getCourseEffectivePrice(course = {}) {
+  if (course?.isFree) return 0;
+  const salePrice = Number(course?.salePrice);
+  const price = Number(course?.price);
+
+  if (!Number.isNaN(salePrice) && salePrice >= 0) return salePrice;
+  if (!Number.isNaN(price) && price >= 0) return price;
+  return 0;
+}
+
+function escapeCsvValue(value) {
+  const raw = value === null || value === undefined ? "" : String(value);
+  const escaped = raw.replace(/"/g, '""');
+  return `"${escaped}"`;
+}
+
+function toCsv(rows = []) {
+  return rows
+    .map((row) => row.map((cell) => escapeCsvValue(cell)).join(","))
+    .join("\n");
 }
 
 export const createEnrollmentRecord = async ({ studentId, courseId }) => {
@@ -220,12 +294,22 @@ export const getStudentDashboardSummary = async (studentId) => {
   };
 };
 
-export const getInstructorDashboardSummary = async (instructorId) => {
+export const getInstructorDashboardSummary = async (
+  instructorId,
+  { from = "", to = "" } = {}
+) => {
   if (!instructorId) {
     throw new Error("instructorId is required");
   }
 
-  const courses = await Course.find({ instructorId })
+  const createdAtRange = normalizeDateRange({ from, to });
+
+  const courseQuery = { instructorId };
+  if (createdAtRange) {
+    courseQuery.createdAt = createdAtRange;
+  }
+
+  const courses = await Course.find(courseQuery)
     .populate({
       path: "lessonIds",
       options: { sort: { order: 1, createdAt: 1 } },
@@ -235,6 +319,32 @@ export const getInstructorDashboardSummary = async (instructorId) => {
 
   const courseIds = courses.map((item) => item._id);
 
+  const sharedCourseQuery = courseIds.length
+    ? { courseId: { $in: courseIds } }
+    : { courseId: { $in: [] } };
+
+  const eventRange = normalizeDateRange({ from, to });
+
+  const enrollmentQuery = { ...sharedCourseQuery };
+  const quizQuery = { ...sharedCourseQuery };
+  const attemptQuery = { ...sharedCourseQuery };
+  const assignmentQuery = { ...sharedCourseQuery };
+  const submissionQuery = { ...sharedCourseQuery };
+  const materialQuery = { ...sharedCourseQuery };
+  const certificateQuery = { instructorId };
+  const conversationQuery = { instructorId };
+
+  if (eventRange) {
+    enrollmentQuery.createdAt = eventRange;
+    quizQuery.createdAt = eventRange;
+    attemptQuery.createdAt = eventRange;
+    assignmentQuery.createdAt = eventRange;
+    submissionQuery.createdAt = eventRange;
+    materialQuery.createdAt = eventRange;
+    certificateQuery.createdAt = eventRange;
+    conversationQuery.createdAt = eventRange;
+  }
+
   const [
     enrollments,
     quizzes,
@@ -242,30 +352,61 @@ export const getInstructorDashboardSummary = async (instructorId) => {
     assignments,
     submissions,
     conversations,
+    materials,
+    certificates,
   ] = await Promise.all([
-    Enrollment.find({ courseId: { $in: courseIds } }).lean(),
-    Quiz.find({ courseId: { $in: courseIds } }).lean(),
-    QuizAttempt.find({ courseId: { $in: courseIds } }).lean(),
-    Assignment.find({ courseId: { $in: courseIds } }).lean(),
-    AssignmentSubmission.find({ courseId: { $in: courseIds } }).lean(),
-    ChatConversation.find({ instructorId }).lean(),
+    Enrollment.find(enrollmentQuery).lean(),
+    Quiz.find(quizQuery).lean(),
+    QuizAttempt.find(attemptQuery).lean(),
+    Assignment.find(assignmentQuery).lean(),
+    AssignmentSubmission.find(submissionQuery).lean(),
+    ChatConversation.find(conversationQuery).lean(),
+    Material.find(materialQuery).lean(),
+    Certificate.find(certificateQuery).lean(),
   ]);
 
   const totalCourses = courses.length;
-
   const totalStudents = new Set(
     enrollments.map((item) => String(item.studentId))
   ).size;
 
-  const enrollmentCountByCourse = new Map();
+  const totalEnrollments = enrollments.length;
+  const completedEnrollments = enrollments.filter((item) => item.completed).length;
+  const completionRate = totalEnrollments
+    ? Math.round((completedEnrollments / totalEnrollments) * 100)
+    : 0;
 
-  enrollments.forEach((item) => {
-    const key = String(item.courseId);
-    enrollmentCountByCourse.set(
-      key,
-      (enrollmentCountByCourse.get(key) || 0) + 1
-    );
-  });
+  const averageProgress = totalEnrollments
+    ? Math.round(
+        enrollments.reduce((sum, item) => sum + Number(item.progress || 0), 0) /
+          totalEnrollments
+      )
+    : 0;
+
+  const totalQuizzes = quizzes.length;
+  const totalQuizAttempts = attempts.length;
+  const averageQuizScore = totalQuizAttempts
+    ? Math.round(
+        attempts.reduce((sum, item) => sum + Number(item.score || 0), 0) /
+          totalQuizAttempts
+      )
+    : 0;
+  const quizPassRate = totalQuizAttempts
+    ? Math.round(
+        (attempts.filter((item) => item.passed).length / totalQuizAttempts) * 100
+      )
+    : 0;
+
+  const totalAssignments = assignments.length;
+  const totalSubmissions = submissions.length;
+  const pendingAssignmentGradingCount = submissions.filter(
+    (item) => item.status !== "graded"
+  ).length;
+
+  const totalMaterials = materials.length;
+  const unreadConversationCount = conversations.filter(
+    (item) => Number(item.instructorUnreadCount || 0) > 0
+  ).length;
 
   const pendingQuizReviewCount = quizzes.reduce((sum, quiz) => {
     const hasAttempt = attempts.some(
@@ -274,32 +415,242 @@ export const getInstructorDashboardSummary = async (instructorId) => {
     return sum + (hasAttempt ? 1 : 0);
   }, 0);
 
-  const pendingAssignmentGradingCount = submissions.filter(
-    (item) => item.status !== "graded"
-  ).length;
+  const enrollmentCountByCourse = new Map();
+  const completionCountByCourse = new Map();
+  const attemptListByCourse = new Map();
+  const submissionCountByCourse = new Map();
+  const materialCountByCourse = new Map();
 
-  const unreadConversationCount = conversations.filter(
-    (item) => Number(item.instructorUnreadCount || 0) > 0
-  ).length;
+  enrollments.forEach((item) => {
+    const key = String(item.courseId);
+    enrollmentCountByCourse.set(
+      key,
+      (enrollmentCountByCourse.get(key) || 0) + 1
+    );
+    if (item.completed) {
+      completionCountByCourse.set(
+        key,
+        (completionCountByCourse.get(key) || 0) + 1
+      );
+    }
+  });
+
+  attempts.forEach((item) => {
+    const key = String(item.courseId);
+    if (!attemptListByCourse.has(key)) {
+      attemptListByCourse.set(key, []);
+    }
+    attemptListByCourse.get(key).push(item);
+  });
+
+  submissions.forEach((item) => {
+    const key = String(item.courseId);
+    submissionCountByCourse.set(
+      key,
+      (submissionCountByCourse.get(key) || 0) + 1
+    );
+  });
+
+  materials.forEach((item) => {
+    const key = String(item.courseId);
+    materialCountByCourse.set(key, (materialCountByCourse.get(key) || 0) + 1);
+  });
+
+  const estimatedRevenue = courses.reduce((sum, course) => {
+    const enrollCount = enrollmentCountByCourse.get(String(course._id)) || 0;
+    return sum + getCourseEffectivePrice(course) * enrollCount;
+  }, 0);
+
+  const topCourses = courses
+    .map((course) => {
+      const key = String(course._id);
+      const courseAttempts = attemptListByCourse.get(key) || [];
+      const attemptCount = courseAttempts.length;
+
+      const avgScore = attemptCount
+        ? Math.round(
+            courseAttempts.reduce(
+              (sum, item) => sum + Number(item.score || 0),
+              0
+            ) / attemptCount
+          )
+        : 0;
+
+      const passRate = attemptCount
+        ? Math.round(
+            (courseAttempts.filter((item) => item.passed).length / attemptCount) *
+              100
+          )
+        : 0;
+
+      const enrollCount = enrollmentCountByCourse.get(key) || 0;
+      const completeCount = completionCountByCourse.get(key) || 0;
+
+      return {
+        _id: course._id,
+        title: course.title,
+        thumbnail: course.thumbnail || "",
+        shortDescription: course.shortDescription || "",
+        description: course.description || "",
+        category: course.category || "",
+        status: course.status || "draft",
+        price: course.price || 0,
+        salePrice: course.salePrice,
+        isFree: !!course.isFree,
+        duration: course.duration || 0,
+        totalLessons: Array.isArray(course.lessonIds) ? course.lessonIds.length : 0,
+        totalEnrollments: enrollCount,
+        rating: Number(course.rating || 0),
+        totalReviews: Number(course.totalReviews || 0),
+        totalMaterials: materialCountByCourse.get(key) || 0,
+        totalAssignments:
+          assignments.filter((item) => String(item.courseId) === key).length || 0,
+        totalQuizzes:
+          quizzes.filter((item) => String(item.courseId) === key).length || 0,
+        totalSubmissions: submissionCountByCourse.get(key) || 0,
+        completionRate: enrollCount
+          ? Math.round((completeCount / enrollCount) * 100)
+          : 0,
+        averageQuizScore: avgScore,
+        quizPassRate: passRate,
+        estimatedRevenue: getCourseEffectivePrice(course) * enrollCount,
+        createdAt: course.createdAt,
+      };
+    })
+    .sort((a, b) => {
+      if (b.totalEnrollments !== a.totalEnrollments) {
+        return b.totalEnrollments - a.totalEnrollments;
+      }
+      if (b.estimatedRevenue !== a.estimatedRevenue) {
+        return b.estimatedRevenue - a.estimatedRevenue;
+      }
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+  const latestCourses = courses.slice(0, 5).map((course) => ({
+    _id: course._id,
+    title: course.title,
+    thumbnail: course.thumbnail || "",
+    shortDescription: course.shortDescription || "",
+    description: course.description || "",
+    category: course.category || "",
+    status: course.status || "draft",
+    price: course.price || 0,
+    salePrice: course.salePrice,
+    isFree: !!course.isFree,
+    duration: course.duration || 0,
+    createdAt: course.createdAt,
+    totalLessons: Array.isArray(course.lessonIds) ? course.lessonIds.length : 0,
+    totalEnrollments: enrollmentCountByCourse.get(String(course._id)) || 0,
+  }));
+
+  const monthlyTrend = buildRecentMonthBuckets(6, to || null);
+  const bucketMap = new Map(monthlyTrend.map((item) => [item.key, item]));
+
+  enrollments.forEach((item) => {
+    const key = getMonthKey(item.createdAt);
+    if (bucketMap.has(key)) {
+      bucketMap.get(key).enrollments += 1;
+    }
+  });
+
+  attempts.forEach((item) => {
+    const key = getMonthKey(item.submittedAt || item.createdAt);
+    if (bucketMap.has(key)) {
+      bucketMap.get(key).quizAttempts += 1;
+    }
+  });
+
+  submissions.forEach((item) => {
+    const key = getMonthKey(item.submittedAt || item.createdAt);
+    if (bucketMap.has(key)) {
+      bucketMap.get(key).submissions += 1;
+    }
+  });
 
   return {
     totalCourses,
     totalStudents,
-    latestCourses: courses.slice(0, 5).map((course) => ({
-      _id: course._id,
-      title: course.title,
-      thumbnail: course.thumbnail || "",
-      category: course.category || "",
-      createdAt: course.createdAt,
-      totalLessons: Array.isArray(course.lessonIds)
-        ? course.lessonIds.length
-        : 0,
-      totalEnrollments: enrollmentCountByCourse.get(String(course._id)) || 0,
-    })),
+    totalEnrollments,
+    completedEnrollments,
+    completionRate,
+    averageProgress,
+    totalMaterials,
+    totalQuizzes,
+    totalQuizAttempts,
+    averageQuizScore,
+    quizPassRate,
+    totalAssignments,
+    totalSubmissions,
     pendingQuizReviewCount,
     pendingAssignmentGradingCount,
     unreadConversationCount,
+    certificateCount: certificates.length,
+    estimatedRevenue,
+    latestCourses,
+    topCourses: topCourses.slice(0, 5),
+    monthlyTrend,
+    filters: {
+      from: from || "",
+      to: to || "",
+    },
   };
+};
+
+export const getInstructorDashboardCsv = async (
+  instructorId,
+  { from = "", to = "" } = {}
+) => {
+  const summary = await getInstructorDashboardSummary(instructorId, {
+    from,
+    to,
+  });
+
+  const rows = [
+    ["Section", "Metric", "Value", "Extra"],
+    ["Filter", "From", summary.filters?.from || "", ""],
+    ["Filter", "To", summary.filters?.to || "", ""],
+    ["Summary", "Total Courses", summary.totalCourses, ""],
+    ["Summary", "Total Students", summary.totalStudents, ""],
+    ["Summary", "Total Enrollments", summary.totalEnrollments, ""],
+    ["Summary", "Completed Enrollments", summary.completedEnrollments, ""],
+    ["Summary", "Completion Rate", `${summary.completionRate}%`, ""],
+    ["Summary", "Average Progress", `${summary.averageProgress}%`, ""],
+    ["Summary", "Total Materials", summary.totalMaterials, ""],
+    ["Summary", "Total Quizzes", summary.totalQuizzes, ""],
+    ["Summary", "Total Quiz Attempts", summary.totalQuizAttempts, ""],
+    ["Summary", "Average Quiz Score", summary.averageQuizScore, ""],
+    ["Summary", "Quiz Pass Rate", `${summary.quizPassRate}%`, ""],
+    ["Summary", "Total Assignments", summary.totalAssignments, ""],
+    ["Summary", "Total Submissions", summary.totalSubmissions, ""],
+    [
+      "Summary",
+      "Pending Assignment Grading",
+      summary.pendingAssignmentGradingCount,
+      "",
+    ],
+    ["Summary", "Unread Conversations", summary.unreadConversationCount, ""],
+    ["Summary", "Certificates", summary.certificateCount, ""],
+    ["Summary", "Estimated Revenue", summary.estimatedRevenue, ""],
+    [""],
+    ["Top Courses", "Title", "Enrollments", "Revenue"],
+    ...summary.topCourses.map((item) => [
+      "Top Course",
+      item.title || "Course",
+      item.totalEnrollments || 0,
+      item.estimatedRevenue || 0,
+    ]),
+    [""],
+    ["Monthly Trend", "Month", "Enrollments", "Quiz Attempts / Submissions"],
+    ...summary.monthlyTrend.map((item) => [
+      "Monthly Trend",
+      item.label || item.key,
+      item.enrollments || 0,
+      `${item.quizAttempts || 0} / ${item.submissions || 0}`,
+    ]),
+  ];
+
+  return `\uFEFF${toCsv(rows)}`;
 };
 
 export const getMyCourses = async (studentId) => {

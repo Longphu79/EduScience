@@ -1,4 +1,5 @@
 import * as enrollmentService from "./enrollment.service.js";
+import { buildInstructorDashboardPdf } from "../../utils/report.util.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 
 function getUserId(req) {
@@ -126,6 +127,7 @@ export const getInstructorDashboardSummary = async (req, res) => {
     const requesterId = getUserId(req);
     const requesterRole = getUserRole(req);
     const { instructorId } = req.params;
+    const { from = "", to = "" } = req.query;
 
     if (!requesterId) {
       return sendError(res, {
@@ -145,13 +147,103 @@ export const getInstructorDashboardSummary = async (req, res) => {
     }
 
     const data = await enrollmentService.getInstructorDashboardSummary(
-      instructorId
+      instructorId,
+      { from, to }
     );
 
     return sendSuccess(res, {
       message: "Get instructor dashboard summary successfully",
       data,
     });
+  } catch (err) {
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
+      message: err.message,
+    });
+  }
+};
+
+export const exportInstructorDashboardCsv = async (req, res) => {
+  try {
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
+    const { instructorId } = req.params;
+    const { from = "", to = "" } = req.query;
+
+    if (!requesterId) {
+      return sendError(res, {
+        statusCode: 401,
+        message: "Unauthorized",
+      });
+    }
+
+    if (
+      requesterRole !== "admin" &&
+      String(requesterId) !== String(instructorId)
+    ) {
+      return sendError(res, {
+        statusCode: 403,
+        message: "You are not allowed to export this dashboard",
+      });
+    }
+
+    const csv = await enrollmentService.getInstructorDashboardCsv(instructorId, {
+      from,
+      to,
+    });
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="instructor-dashboard-report.csv"'
+    );
+
+    return res.status(200).send(csv);
+  } catch (err) {
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
+      message: err.message,
+    });
+  }
+};
+
+export const exportInstructorDashboardPdf = async (req, res) => {
+  try {
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
+    const { instructorId } = req.params;
+    const { from = "", to = "" } = req.query;
+
+    if (!requesterId) {
+      return sendError(res, {
+        statusCode: 401,
+        message: "Unauthorized",
+      });
+    }
+
+    if (
+      requesterRole !== "admin" &&
+      String(requesterId) !== String(instructorId)
+    ) {
+      return sendError(res, {
+        statusCode: 403,
+        message: "You are not allowed to export this dashboard",
+      });
+    }
+
+    const summary = await enrollmentService.getInstructorDashboardSummary(
+      instructorId,
+      { from, to }
+    );
+    const pdfBuffer = await buildInstructorDashboardPdf(summary);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="instructor-dashboard-report.pdf"'
+    );
+
+    return res.status(200).send(pdfBuffer);
   } catch (err) {
     return sendError(res, {
       statusCode: getErrorStatus(err),
