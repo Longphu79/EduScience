@@ -6,6 +6,8 @@ import {
     Outlet,
 } from "react-router-dom";
 import { MainLayout } from "./layouts/MainLayout";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
@@ -44,6 +46,7 @@ import CourseChatPage from "./features/chat/pages/CourseChatPage";
 import CourseCertificatePage from "./features/certificate/pages/CourseCertificatePage";
 import PublicCertificatePage from "./features/certificate/pages/PublicCertificatePage";
 import CartPage from "./features/cart/pages/CartPage";
+import WalletPage from "./features/wallet/pages/WalletPage";
 
 import ProfilePage from "./features/user/pages/ProfilePage";
 import UserProfilePage from "./features/user/pages/UserProfilePage";
@@ -55,6 +58,7 @@ import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
 import AdminCoursesPage from "./features/admin/pages/AdminCoursesPage";
 import AdminUserDetailPage from "./features/admin/pages/AdminUserDetailPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
+import AdminWithdrawalsPage from "./features/admin/pages/AdminWithdrawalsPage";
 
 import CourseReviewsPage from "./features/review/pages/CourseReviewsPage";
 
@@ -121,6 +125,18 @@ function PublicOnlyRoute() {
 function App() {
     return (
         <BrowserRouter>
+            <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="colored"
+            />
             <Routes>
                 <Route path="/" element={<MainLayout />}>
                     <Route index element={<Home />} />
@@ -170,6 +186,7 @@ function App() {
                             path="courses/:courseId/chat"
                             element={<CourseChatPage />}
                         />
+                        <Route path="wallet" element={<WalletPage />} />
                     </Route>
 
                     <Route element={<RequireRole allowRoles={["student"]} />}>
@@ -285,6 +302,10 @@ function App() {
                         <Route
                             path="admin/users/:userId"
                             element={<AdminUserDetailPage />}
+                        />
+                        <Route
+                            path="admin/withdrawals"
+                            element={<AdminWithdrawalsPage />}
                         />
                         <Route
                             path="admin/courses"

@@ -1,9 +1,10 @@
 import {
-  LogOut,
-  User,
-  LayoutDashboard,
-  PencilLine,
-  ShieldCheck,
+    LogOut,
+    User,
+    LayoutDashboard,
+    PencilLine,
+    ShieldCheck,
+    Wallet,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -11,9 +12,9 @@ import { useAuth } from "../features/auth/state/useAuth";
 import { useCartCount } from "../features/cart/hooks/useCartCount";
 import MessageCenter from "../features/chat/components/MessageCenter";
 import {
-  chatUnwrap,
-  getMyUnreadSummary,
-  getChatSocket,
+    chatUnwrap,
+    getMyUnreadSummary,
+    getChatSocket,
 } from "../features/chat/services/chat.service";
 import BrandLogo from "../shared/components/header/BrandLogo";
 import DesktopNav from "../shared/components/header/DesktopNav";
@@ -25,190 +26,202 @@ import MobileMenu from "../shared/components/header/MobileMenu";
 import "../shared/components/header/header.css";
 
 const baseNavItems = [
-  { label: "Features", to: "/features" },
-  { label: "Courses", to: "/courses" },
-  { label: "About Us", to: "/aboutus" },
+    { label: "Features", to: "/features" },
+    { label: "Courses", to: "/courses" },
+    { label: "About Us", to: "/aboutus" },
 ];
 
 export function Header() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isMessageCenterOpen, setIsMessageCenterOpen] = useState(false);
-  const [conversationCount, setConversationCount] = useState(0);
+    const [mobileOpen, setMobileOpen] = useState(false);
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isMessageCenterOpen, setIsMessageCenterOpen] = useState(false);
+    const [conversationCount, setConversationCount] = useState(0);
 
-  const { user, isAuthenticated, booting, logout } = useAuth();
-  const { cartCount } = useCartCount();
+    const { user, isAuthenticated, booting, logout } = useAuth();
+    const { cartCount } = useCartCount();
 
-  const location = useLocation();
-  const navigate = useNavigate();
+    const location = useLocation();
+    const navigate = useNavigate();
 
-  const currentUserId = user?._id || user?.id || user?.userId || null;
-  const userRole = user?.role?.toLowerCase?.() || "";
+    const currentUserId = user?._id || user?.id || user?.userId || null;
+    const userRole = user?.role?.toLowerCase?.() || "";
 
-  const isInstructor = isAuthenticated && userRole === "instructor";
-  const isStudent = isAuthenticated && userRole === "student";
-  const isAdmin = isAuthenticated && userRole === "admin";
-  const canUseChat = isStudent || isInstructor;
+    const isInstructor = isAuthenticated && userRole === "instructor";
+    const isStudent = isAuthenticated && userRole === "student";
+    const isAdmin = isAuthenticated && userRole === "admin";
+    const canUseChat = isStudent || isInstructor;
 
-  const navItems = useMemo(() => {
-    const items = [...baseNavItems];
+    const navItems = useMemo(() => {
+        const items = [...baseNavItems];
 
-    if (isStudent) {
-      items.push({ label: "My Courses", to: "/my-courses" });
+        if (isStudent) {
+            items.push({ label: "My Courses", to: "/my-courses" });
+        }
+
+        if (isInstructor) {
+            items.push({ label: "Instructor", to: "/instructor/courses" });
+        }
+
+        if (isAdmin) {
+            items.push({ label: "Admin", to: "/admin/dashboard" });
+        }
+
+        return items;
+    }, [isInstructor, isStudent, isAdmin]);
+
+    useEffect(() => {
+        setMobileOpen(false);
+        setIsUserMenuOpen(false);
+        setIsMessageCenterOpen(false);
+    }, [location.pathname]);
+
+    useEffect(() => {
+        async function loadUnreadCount() {
+            if (booting) return;
+
+            if (!isAuthenticated || !canUseChat) {
+                setConversationCount(0);
+                return;
+            }
+
+            try {
+                const response = await getMyUnreadSummary();
+                const data = chatUnwrap(response);
+                setConversationCount(Number(data?.unreadMessages || 0));
+            } catch {
+                setConversationCount(0);
+            }
+        }
+
+        loadUnreadCount();
+    }, [booting, isAuthenticated, canUseChat, location.pathname]);
+
+    useEffect(() => {
+        if (booting) return;
+
+        if (!isAuthenticated || !canUseChat) {
+            setConversationCount(0);
+            return;
+        }
+
+        const socket = getChatSocket();
+        if (!socket) return;
+
+        const handleUnreadUpdated = (payload) => {
+            setConversationCount(Number(payload?.unreadMessages || 0));
+        };
+
+        socket.on("chat:unread-updated", handleUnreadUpdated);
+
+        return () => {
+            socket.off("chat:unread-updated", handleUnreadUpdated);
+        };
+    }, [booting, isAuthenticated, canUseChat]);
+
+    async function handleLogout() {
+        try {
+            await logout?.();
+        } finally {
+            setIsUserMenuOpen(false);
+            setIsMessageCenterOpen(false);
+            navigate("/auth/login");
+        }
     }
 
-    if (isInstructor) {
-      items.push({ label: "Instructor", to: "/instructor/courses" });
-    }
+    if (booting) return null;
 
-    if (isAdmin) {
-      items.push({ label: "Admin", to: "/admin/dashboard" });
-    }
-
-    return items;
-  }, [isInstructor, isStudent, isAdmin]);
-
-  useEffect(() => {
-    setMobileOpen(false);
-    setIsUserMenuOpen(false);
-    setIsMessageCenterOpen(false);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    async function loadUnreadCount() {
-      if (booting) return;
-
-      if (!isAuthenticated || !canUseChat) {
-        setConversationCount(0);
-        return;
-      }
-
-      try {
-        const response = await getMyUnreadSummary();
-        const data = chatUnwrap(response);
-        setConversationCount(Number(data?.unreadMessages || 0));
-      } catch {
-        setConversationCount(0);
-      }
-    }
-
-    loadUnreadCount();
-  }, [booting, isAuthenticated, canUseChat, location.pathname]);
-
-  useEffect(() => {
-    if (booting) return;
-
-    if (!isAuthenticated || !canUseChat) {
-      setConversationCount(0);
-      return;
-    }
-
-    const socket = getChatSocket();
-    if (!socket) return;
-
-    const handleUnreadUpdated = (payload) => {
-      setConversationCount(Number(payload?.unreadMessages || 0));
-    };
-
-    socket.on("chat:unread-updated", handleUnreadUpdated);
-
-    return () => {
-      socket.off("chat:unread-updated", handleUnreadUpdated);
-    };
-  }, [booting, isAuthenticated, canUseChat]);
-
-  async function handleLogout() {
-    try {
-      await logout?.();
-    } finally {
-      setIsUserMenuOpen(false);
-      setIsMessageCenterOpen(false);
-      navigate("/auth/login");
-    }
-  }
-
-  if (booting) return null;
-
-  return (
-    <header className="header-shell sticky top-0 z-[80] isolate border-b border-slate-200/70 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/65">
-      <div className="header-shell__inner mx-auto grid h-[74px] max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-6 px-4 sm:px-6 lg:px-8">
-        <div className="header-brand-zone relative z-[120] flex min-w-fit items-center">
-          <BrandLogo onClick={() => navigate("/")} />
-        </div>
-
-        <DesktopNav navItems={navItems} />
-
-        <div className="header-actions relative z-20 hidden min-w-fit items-center justify-end gap-3 md:flex">
-          {!isAuthenticated ? (
-            <HeaderAuthActions />
-          ) : (
-            <>
-              {isStudent ? <HeaderCartButton cartCount={cartCount} /> : null}
-
-              {canUseChat ? (
-                <div className="relative shrink-0">
-                  <HeaderMessageButton
-                    conversationCount={conversationCount}
-                    onClick={() => {
-                      setIsMessageCenterOpen((prev) => !prev);
-                      setIsUserMenuOpen(false);
-                    }}
-                  />
-
-                  <MessageCenter
-                    open={isMessageCenterOpen}
-                    currentUserId={currentUserId}
-                    onClose={() => setIsMessageCenterOpen(false)}
-                    onOpenConversation={(conversation) => {
-                      window.dispatchEvent(
-                        new CustomEvent("open-chat-conversation-dock", {
-                          detail: { conversation },
-                        })
-                      );
-                      setIsMessageCenterOpen(false);
-                    }}
-                  />
+    return (
+        <header className="header-shell sticky top-0 z-[80] isolate border-b border-slate-200/70 bg-white/80 backdrop-blur-xl supports-[backdrop-filter]:bg-white/65">
+            <div className="header-shell__inner mx-auto grid h-[74px] max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-6 px-4 sm:px-6 lg:px-8">
+                <div className="header-brand-zone relative z-[120] flex min-w-fit items-center">
+                    <BrandLogo onClick={() => navigate("/")} />
                 </div>
-              ) : null}
 
-              <HeaderUserMenu
-                open={isUserMenuOpen}
-                user={user}
-                userRole={userRole}
-                isStudent={isStudent}
-                isInstructor={isInstructor}
-                isAdmin={isAdmin}
-                onToggle={() => {
-                  setIsUserMenuOpen((prev) => !prev);
-                  setIsMessageCenterOpen(false);
-                }}
-                onClose={() => setIsUserMenuOpen(false)}
-                onNavigate={navigate}
-                onLogout={handleLogout}
-                icons={{
-                  logout: LogOut,
-                  user: User,
-                  dashboard: LayoutDashboard,
-                  edit: PencilLine,
-                  admin: ShieldCheck,
-                }}
-              />
-            </>
-          )}
-        </div>
+                <DesktopNav navItems={navItems} />
 
-        <MobileMenu
-          mobileOpen={mobileOpen}
-          setMobileOpen={setMobileOpen}
-          navItems={navItems}
-          isAuthenticated={isAuthenticated}
-          isStudent={isStudent}
-          isInstructor={isInstructor}
-          isAdmin={isAdmin}
-          cartCount={cartCount}
-          onLogout={handleLogout}
-        />
-      </div>
-    </header>
-  );
+                <div className="header-actions relative z-20 hidden min-w-fit items-center justify-end gap-3 md:flex">
+                    {!isAuthenticated ? (
+                        <HeaderAuthActions />
+                    ) : (
+                        <>
+                            {isStudent ? (
+                                <HeaderCartButton cartCount={cartCount} />
+                            ) : null}
+
+                            {canUseChat ? (
+                                <div className="relative shrink-0">
+                                    <HeaderMessageButton
+                                        conversationCount={conversationCount}
+                                        onClick={() => {
+                                            setIsMessageCenterOpen(
+                                                (prev) => !prev,
+                                            );
+                                            setIsUserMenuOpen(false);
+                                        }}
+                                    />
+
+                                    <MessageCenter
+                                        open={isMessageCenterOpen}
+                                        currentUserId={currentUserId}
+                                        onClose={() =>
+                                            setIsMessageCenterOpen(false)
+                                        }
+                                        onOpenConversation={(conversation) => {
+                                            window.dispatchEvent(
+                                                new CustomEvent(
+                                                    "open-chat-conversation-dock",
+                                                    {
+                                                        detail: {
+                                                            conversation,
+                                                        },
+                                                    },
+                                                ),
+                                            );
+                                            setIsMessageCenterOpen(false);
+                                        }}
+                                    />
+                                </div>
+                            ) : null}
+
+                            <HeaderUserMenu
+                                open={isUserMenuOpen}
+                                user={user}
+                                userRole={userRole}
+                                isStudent={isStudent}
+                                isInstructor={isInstructor}
+                                isAdmin={isAdmin}
+                                onToggle={() => {
+                                    setIsUserMenuOpen((prev) => !prev);
+                                    setIsMessageCenterOpen(false);
+                                }}
+                                onClose={() => setIsUserMenuOpen(false)}
+                                onNavigate={navigate}
+                                onLogout={handleLogout}
+                                icons={{
+                                    logout: LogOut,
+                                    user: User,
+                                    dashboard: LayoutDashboard,
+                                    edit: PencilLine,
+                                    admin: ShieldCheck,
+                                    wallet: Wallet,
+                                }}
+                            />
+                        </>
+                    )}
+                </div>
+
+                <MobileMenu
+                    mobileOpen={mobileOpen}
+                    setMobileOpen={setMobileOpen}
+                    navItems={navItems}
+                    isAuthenticated={isAuthenticated}
+                    isStudent={isStudent}
+                    isInstructor={isInstructor}
+                    isAdmin={isAdmin}
+                    cartCount={cartCount}
+                    onLogout={handleLogout}
+                />
+            </div>
+        </header>
+    );
 }

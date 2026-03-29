@@ -58,20 +58,31 @@ const processPayment = async (order) => {
             );
         }
 
-        // Increment totalEnrollments
-        const course = await Course.findByIdAndUpdate(item.courseId, {
-            $inc: { totalEnrollments: 1 },
-        });
-
-        // Update instructor revenue
+        const course = await Course.findById(item.courseId);
         if (course?.instructorId) {
-            await Instructor.findByIdAndUpdate(course.instructorId, {
-                $inc: { revenue: item.price },
-            });
+            const PLATFORM_FEE = 0.2;
+            const instructorEarning = item.price * (1 - PLATFORM_FEE);
+
+            await Wallet.findOneAndUpdate(
+                { userId: course.instructorId },
+                {
+                    $inc: {
+                        balance: instructorEarning,
+                        totalEarned: instructorEarning,
+                    },
+                    userModel: "Instructor",
+                },
+                { upsert: true },
+            );
+
+            await Wallet.findOneAndUpdate(
+                { userId: order.userId },
+                { $inc: { totalDeposited: item.price }, userModel: "Student" }, // totalDeposited ở đây hiểu là tổng chi tiêu
+                { upsert: true },
+            );
         }
     }
 
-    // Clear cart
     await Cart.findOneAndUpdate(
         { user: order.userId },
         { $set: { items: [] } },

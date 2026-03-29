@@ -1,11 +1,11 @@
 import express from "express";
 import {
-  getMyCart,
-  addToCart,
-  removeFromCart,
-  updateItemQuantity,
-  clearMyCart,
-  checkoutMyCart,
+    getMyCart,
+    addToCart,
+    removeFromCart,
+    updateItemQuantity,
+    clearMyCart,
+    checkoutMyCart,
 } from "./cart.controller.js";
 import { verifyToken } from "../../middlewares/auth.middleware.js";
 

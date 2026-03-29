@@ -69,3 +69,18 @@ export async function moveAdminCourseToDraft(courseId) {
     );
     return adminUnwrap(response);
 }
+
+export async function getAdminWithdrawals(params = {}) {
+    const response = await api.get(
+        `/api/admin/withdrawals${buildAdminQuery(params)}`,
+    );
+    return adminUnwrap(response);
+}
+
+export async function processAdminWithdrawal(withdrawalId, body) {
+    const response = await api.patch(
+        `/api/admin/withdrawals/${withdrawalId}/status`,
+        body,
+    );
+    return adminUnwrap(response);
+}
