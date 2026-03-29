@@ -26,6 +26,23 @@ export async function exportAdminDashboardPdf(params = {}) {
   return response?.data;
 }
 
+export async function getAdminInstructorLeaderboard(params = {}) {
+  const response = await api.get(
+    `/admin/instructors/leaderboard${buildAdminQuery(params)}`
+  );
+  return adminUnwrap(response);
+}
+
+export async function exportAdminInstructorLeaderboardCsv(params = {}) {
+  const response = await api.get(
+    `/admin/instructors/leaderboard/export/csv${buildAdminQuery(params)}`,
+    {
+      responseType: "blob",
+    }
+  );
+  return response?.data;
+}
+
 export async function getAdminUsers(params = {}) {
   const response = await api.get(`/admin/users${buildAdminQuery(params)}`);
   return adminUnwrap(response);

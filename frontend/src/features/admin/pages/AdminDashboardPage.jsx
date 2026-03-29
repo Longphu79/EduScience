@@ -6,6 +6,7 @@ import { formatAdminNumber } from "../utils/admin.helpers";
 import {
   exportAdminDashboardCsv,
   exportAdminDashboardPdf,
+  exportAdminInstructorLeaderboardCsv,
 } from "../services/admin.service";
 import AdminPageHero from "../components/AdminPageHero";
 import AdminStatCard from "../components/AdminStatCard";
@@ -18,6 +19,7 @@ import AdminDashboardRecentCoursesSection from "../components/AdminDashboardRece
 import AdminDashboardTopCoursesSection from "../components/AdminDashboardTopCoursesSection";
 import AdminDashboardLoadingState from "../components/AdminDashboardLoadingState";
 import AdminDashboardChartsSection from "../components/AdminDashboardChartsSection";
+import AdminInstructorLeaderboardSection from "../components/AdminInstructorLeaderboardSection";
 import "../styles/admin-dashboard-page.css";
 
 function downloadBlob(blob, filename) {
@@ -34,19 +36,25 @@ function downloadBlob(blob, filename) {
 export default function AdminDashboardPage() {
   const {
     loading,
+    leaderboardLoading,
     stats,
     analytics,
     recentUsers,
     recentCourses,
     topCourses,
+    leaderboardItems,
+    leaderboardTopThree,
     inactiveUsers,
     toast,
     setToast,
     fetchDashboard,
+    fetchLeaderboard,
     filters,
     setFilters,
     applyPreset,
     resetFilters,
+    leaderboardSortBy,
+    setLeaderboardSortBy,
   } = useAdminDashboardPage();
 
   async function handleExportCsv() {
@@ -81,8 +89,40 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function handleExportLeaderboardCsv() {
+    try {
+      const blob = await exportAdminInstructorLeaderboardCsv({
+        ...filters,
+        sortBy: leaderboardSortBy,
+        limit: 50,
+      });
+      downloadBlob(blob, "admin-instructor-leaderboard.csv");
+      setToast({
+        message: "Instructor leaderboard CSV exported successfully",
+        kind: "success",
+      });
+    } catch (error) {
+      setToast({
+        message: error?.message || "Failed to export instructor leaderboard CSV",
+        kind: "error",
+      });
+    }
+  }
+
   function handleApplyFilters() {
     fetchDashboard(filters);
+    fetchLeaderboard({
+      filters,
+      sortBy: leaderboardSortBy,
+    });
+  }
+
+  function handleChangeLeaderboardSort(value) {
+    setLeaderboardSortBy(value);
+    fetchLeaderboard({
+      filters,
+      sortBy: value,
+    });
   }
 
   return (
@@ -102,7 +142,13 @@ export default function AdminDashboardPage() {
           <>
             <button
               type="button"
-              onClick={() => fetchDashboard(filters)}
+              onClick={() => {
+                fetchDashboard(filters);
+                fetchLeaderboard({
+                  filters,
+                  sortBy: leaderboardSortBy,
+                });
+              }}
               className="admin-dashboard-action-btn"
             >
               Refresh
@@ -137,7 +183,7 @@ export default function AdminDashboardPage() {
 
       <AdminSectionCard
         title="Date Range Filter"
-        subtitle="Filter dashboard data by date range"
+        subtitle="Filter dashboard and leaderboard data by date range"
       >
         <div className="admin-dashboard-filter-bar">
           <div className="admin-dashboard-filter-field">
@@ -306,6 +352,15 @@ export default function AdminDashboardPage() {
           </div>
 
           <AdminDashboardChartsSection stats={stats} analytics={analytics} />
+
+          <AdminInstructorLeaderboardSection
+            items={leaderboardItems}
+            topThree={leaderboardTopThree}
+            sortBy={leaderboardSortBy}
+            onSortChange={handleChangeLeaderboardSort}
+            onExportCsv={handleExportLeaderboardCsv}
+            loading={leaderboardLoading}
+          />
 
           <AdminSectionCard
             title="Needs Attention"

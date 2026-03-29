@@ -218,6 +218,28 @@ export async function getStudentDashboardSummary(studentId) {
   );
 }
 
+export async function getStudentAnalytics(studentId, params = {}) {
+  if (!studentId) {
+    throw new Error("studentId is required");
+  }
+
+  return apiGet(
+    `/enrollment/dashboard/student/${studentId}/analytics${buildQuery(params)}`,
+    "Failed to fetch student learning analytics"
+  );
+}
+
+export async function exportStudentAnalyticsCsv(studentId, params = {}) {
+  if (!studentId) {
+    throw new Error("studentId is required");
+  }
+
+  return apiGetBlob(
+    `/enrollment/dashboard/student/${studentId}/export/csv${buildQuery(params)}`,
+    "Failed to export student analytics csv"
+  );
+}
+
 export async function getInstructorDashboardSummary(instructorId, params = {}) {
   if (!instructorId) {
     throw new Error("instructorId is required");
