@@ -3,6 +3,10 @@ import Toast from "../../../shared/components/Toast";
 import Button from "../../../shared/components/Button";
 import useAdminDashboardPage from "../hooks/useAdminDashboardPage";
 import { formatAdminNumber } from "../utils/admin.helpers";
+import {
+  exportAdminDashboardCsv,
+  exportAdminDashboardPdf,
+} from "../services/admin.service";
 import AdminPageHero from "../components/AdminPageHero";
 import AdminStatCard from "../components/AdminStatCard";
 import AdminAttentionPanel from "../components/AdminAttentionPanel";
@@ -13,12 +17,25 @@ import AdminDashboardRecentUsersSection from "../components/AdminDashboardRecent
 import AdminDashboardRecentCoursesSection from "../components/AdminDashboardRecentCoursesSection";
 import AdminDashboardTopCoursesSection from "../components/AdminDashboardTopCoursesSection";
 import AdminDashboardLoadingState from "../components/AdminDashboardLoadingState";
+import AdminDashboardChartsSection from "../components/AdminDashboardChartsSection";
 import "../styles/admin-dashboard-page.css";
+
+function downloadBlob(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+}
 
 export default function AdminDashboardPage() {
   const {
     loading,
     stats,
+    analytics,
     recentUsers,
     recentCourses,
     topCourses,
@@ -26,7 +43,47 @@ export default function AdminDashboardPage() {
     toast,
     setToast,
     fetchDashboard,
+    filters,
+    setFilters,
+    applyPreset,
+    resetFilters,
   } = useAdminDashboardPage();
+
+  async function handleExportCsv() {
+    try {
+      const blob = await exportAdminDashboardCsv(filters);
+      downloadBlob(blob, "admin-dashboard-report.csv");
+      setToast({
+        message: "Admin dashboard CSV exported successfully",
+        kind: "success",
+      });
+    } catch (error) {
+      setToast({
+        message: error?.message || "Failed to export admin dashboard CSV",
+        kind: "error",
+      });
+    }
+  }
+
+  async function handleExportPdf() {
+    try {
+      const blob = await exportAdminDashboardPdf(filters);
+      downloadBlob(blob, "admin-dashboard-report.pdf");
+      setToast({
+        message: "Admin dashboard PDF exported successfully",
+        kind: "success",
+      });
+    } catch (error) {
+      setToast({
+        message: error?.message || "Failed to export admin dashboard PDF",
+        kind: "error",
+      });
+    }
+  }
+
+  function handleApplyFilters() {
+    fetchDashboard(filters);
+  }
 
   return (
     <div className="admin-dashboard-page">
@@ -45,10 +102,26 @@ export default function AdminDashboardPage() {
           <>
             <button
               type="button"
-              onClick={fetchDashboard}
+              onClick={() => fetchDashboard(filters)}
               className="admin-dashboard-action-btn"
             >
               Refresh
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="admin-dashboard-action-btn"
+            >
+              Export CSV
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              className="admin-dashboard-action-btn"
+            >
+              Export PDF
             </button>
 
             <Link to="/admin/users">
@@ -61,6 +134,85 @@ export default function AdminDashboardPage() {
           </>
         }
       />
+
+      <AdminSectionCard
+        title="Date Range Filter"
+        subtitle="Filter dashboard data by date range"
+      >
+        <div className="admin-dashboard-filter-bar">
+          <div className="admin-dashboard-filter-field">
+            <label className="admin-dashboard-filter-label">From</label>
+            <input
+              type="date"
+              value={filters.from}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, from: e.target.value }))
+              }
+              className="admin-dashboard-filter-input"
+            />
+          </div>
+
+          <div className="admin-dashboard-filter-field">
+            <label className="admin-dashboard-filter-label">To</label>
+            <input
+              type="date"
+              value={filters.to}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, to: e.target.value }))
+              }
+              className="admin-dashboard-filter-input"
+            />
+          </div>
+
+          <div className="admin-dashboard-filter-actions">
+            <button
+              type="button"
+              onClick={handleApplyFilters}
+              className="admin-dashboard-action-btn"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="admin-dashboard-action-btn"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div className="admin-dashboard-preset-row">
+          <button
+            type="button"
+            onClick={() => applyPreset("7d")}
+            className="admin-dashboard-preset-btn"
+          >
+            Last 7 days
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset("30d")}
+            className="admin-dashboard-preset-btn"
+          >
+            Last 30 days
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset("month")}
+            className="admin-dashboard-preset-btn"
+          >
+            This month
+          </button>
+          <button
+            type="button"
+            onClick={() => applyPreset("year")}
+            className="admin-dashboard-preset-btn"
+          >
+            This year
+          </button>
+        </div>
+      </AdminSectionCard>
 
       <div className="admin-dashboard-quick-grid">
         <AdminDashboardQuickActionCard
@@ -126,12 +278,34 @@ export default function AdminDashboardPage() {
               tone="rose"
             />
             <AdminStatCard
+              label="Estimated Revenue"
+              value={formatAdminNumber(stats.estimatedRevenue)}
+              subtitle="Based on enrollments × effective course price"
+              tone="slate"
+            />
+            <AdminStatCard
+              label="Completion Rate"
+              value={`${formatAdminNumber(stats.completionRate)}%`}
+              subtitle={`${formatAdminNumber(
+                stats.averageProgress
+              )}% average learner progress`}
+              tone="indigo"
+            />
+            <AdminStatCard
+              label="Certificates"
+              value={formatAdminNumber(stats.totalCertificates)}
+              subtitle={`${formatAdminNumber(stats.totalReviews)} reviews in total`}
+              tone="emerald"
+            />
+            <AdminStatCard
               label="Admins"
               value={formatAdminNumber(stats.totalAdmins)}
               subtitle={`${formatAdminNumber(stats.totalDraftCourses)} draft courses`}
-              tone="slate"
+              tone="amber"
             />
           </div>
+
+          <AdminDashboardChartsSection stats={stats} analytics={analytics} />
 
           <AdminSectionCard
             title="Needs Attention"

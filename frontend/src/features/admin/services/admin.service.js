@@ -1,9 +1,29 @@
 import api from "../../../services/api.js";
 import { adminUnwrap, buildAdminQuery } from "../utils/admin.helpers";
 
-export async function getAdminDashboard() {
-  const response = await api.get("/admin/dashboard");
+export async function getAdminDashboard(params = {}) {
+  const response = await api.get(`/admin/dashboard${buildAdminQuery(params)}`);
   return adminUnwrap(response);
+}
+
+export async function exportAdminDashboardCsv(params = {}) {
+  const response = await api.get(
+    `/admin/dashboard/export/csv${buildAdminQuery(params)}`,
+    {
+      responseType: "blob",
+    }
+  );
+  return response?.data;
+}
+
+export async function exportAdminDashboardPdf(params = {}) {
+  const response = await api.get(
+    `/admin/dashboard/export/pdf${buildAdminQuery(params)}`,
+    {
+      responseType: "blob",
+    }
+  );
+  return response?.data;
 }
 
 export async function getAdminUsers(params = {}) {
