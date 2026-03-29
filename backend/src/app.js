@@ -16,6 +16,7 @@ import certificateRoute from "./modules/certificate/certificate.route.js";
 import chatRoute from "./modules/chat/chat.route.js";
 import adminRoute from "./modules/admin/admin.route.js";
 import uploadRoute from "./modules/upload/upload.route.js";
+import gamificationRoute from "./modules/gamification/gamification.route.js";
 
 import { notFoundMiddleware } from "./middlewares/notFound.middleware.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
@@ -40,7 +41,7 @@ const corsOptions = {
 
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
-  credentials: true, 
+  credentials: true,
   optionsSuccessStatus: 200,
 };
 
@@ -76,6 +77,7 @@ app.use("/certificate", certificateRoute);
 app.use("/chat", chatRoute);
 app.use("/admin", adminRoute);
 app.use("/upload", uploadRoute);
+app.use("/gamification", gamificationRoute);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

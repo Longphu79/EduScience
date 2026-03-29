@@ -122,6 +122,94 @@ export const getStudentDashboardSummary = async (req, res) => {
   }
 };
 
+export const getStudentAnalytics = async (req, res) => {
+  try {
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
+    const { studentId } = req.params;
+    const { from = "", to = "" } = req.query;
+
+    if (!requesterId) {
+      return sendError(res, {
+        statusCode: 401,
+        message: "Unauthorized",
+      });
+    }
+
+    if (
+      requesterRole !== "admin" &&
+      String(requesterId) !== String(studentId)
+    ) {
+      return sendError(res, {
+        statusCode: 403,
+        message: "You are not allowed to view this analytics dashboard",
+      });
+    }
+
+    const data = await enrollmentService.getStudentLearningAnalytics(studentId, {
+      from,
+      to,
+    });
+
+    return sendSuccess(res, {
+      message: "Get student analytics successfully",
+      data,
+    });
+  } catch (err) {
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
+      message: err.message || "Failed to load student analytics",
+    });
+  }
+};
+
+export const exportStudentAnalyticsCsv = async (req, res) => {
+  try {
+    const requesterId = getUserId(req);
+    const requesterRole = getUserRole(req);
+    const { studentId } = req.params;
+    const { from = "", to = "" } = req.query;
+
+    if (!requesterId) {
+      return sendError(res, {
+        statusCode: 401,
+        message: "Unauthorized",
+      });
+    }
+
+    if (
+      requesterRole !== "admin" &&
+      String(requesterId) !== String(studentId)
+    ) {
+      return sendError(res, {
+        statusCode: 403,
+        message: "You are not allowed to export this analytics dashboard",
+      });
+    }
+
+    const csv = await enrollmentService.getStudentLearningAnalyticsCsv(
+      studentId,
+      {
+        from,
+        to,
+      }
+    );
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="student-learning-analytics-report.csv"'
+    );
+
+    return res.status(200).send(csv);
+  } catch (err) {
+    return sendError(res, {
+      statusCode: getErrorStatus(err),
+      message: err.message || "Failed to export student analytics csv",
+    });
+  }
+};
+
 export const getInstructorDashboardSummary = async (req, res) => {
   try {
     const requesterId = getUserId(req);
@@ -462,14 +550,14 @@ export const getStudentsByCourse = async (req, res) => {
       });
     }
 
-    const data = await enrollmentService.getStudentsByCourse(courseId, {
+    const students = await enrollmentService.getStudentsByCourse(courseId, {
       requesterId,
       requesterRole,
     });
 
     return sendSuccess(res, {
       message: "Get students by course successfully",
-      data,
+      data: students,
     });
   } catch (err) {
     return sendError(res, {
@@ -492,18 +580,15 @@ export const getStudentProgressDetail = async (req, res) => {
       });
     }
 
-    const data = await enrollmentService.getStudentProgressDetail(
+    const detail = await enrollmentService.getStudentProgressDetail(
       courseId,
       studentId,
-      {
-        requesterId,
-        requesterRole,
-      }
+      { requesterId, requesterRole }
     );
 
     return sendSuccess(res, {
       message: "Get student progress detail successfully",
-      data,
+      data: detail,
     });
   } catch (err) {
     return sendError(res, {

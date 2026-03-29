@@ -63,6 +63,15 @@ function getMonthKey(dateValue) {
   return `${year}-${month}`;
 }
 
+function getDayKey(dateValue) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function buildRecentMonthBuckets(monthCount = 6, endDate = null) {
   const base = endDate ? new Date(endDate) : new Date();
   const now = Number.isNaN(base.getTime()) ? new Date() : base;
@@ -78,6 +87,31 @@ function buildRecentMonthBuckets(monthCount = 6, endDate = null) {
       enrollments: 0,
       quizAttempts: 0,
       submissions: 0,
+    });
+  }
+
+  return buckets;
+}
+
+function buildRecentWeekBuckets(dayCount = 7, endDate = null) {
+  const base = endDate ? new Date(endDate) : new Date();
+  const now = Number.isNaN(base.getTime()) ? new Date() : base;
+  now.setHours(0, 0, 0, 0);
+
+  const buckets = [];
+
+  for (let i = dayCount - 1; i >= 0; i -= 1) {
+    const date = new Date(now);
+    date.setDate(now.getDate() - i);
+
+    const key = getDayKey(date);
+    buckets.push({
+      key,
+      label: `${`${date.getDate()}`.padStart(2, "0")}/${`${date.getMonth() + 1}`.padStart(2, "0")}`,
+      activities: 0,
+      quizAttempts: 0,
+      submissions: 0,
+      learningHours: 0,
     });
   }
 
@@ -104,6 +138,74 @@ function toCsv(rows = []) {
   return rows
     .map((row) => row.map((cell) => escapeCsvValue(cell)).join(","))
     .join("\n");
+}
+
+function calculateStreakStats(dateValues = []) {
+  const uniqueDays = [...new Set(dateValues.map((item) => getDayKey(item)).filter(Boolean))]
+    .sort((a, b) => new Date(a) - new Date(b));
+
+  if (!uniqueDays.length) {
+    return {
+      currentStreak: 0,
+      bestStreak: 0,
+      activeDays: 0,
+      lastActiveDate: null,
+    };
+  }
+
+  let bestStreak = 1;
+  let running = 1;
+
+  for (let i = 1; i < uniqueDays.length; i += 1) {
+    const prev = new Date(uniqueDays[i - 1]);
+    const current = new Date(uniqueDays[i]);
+    const diffDays = Math.round(
+      (current.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (diffDays === 1) {
+      running += 1;
+    } else {
+      running = 1;
+    }
+
+    if (running > bestStreak) {
+      bestStreak = running;
+    }
+  }
+
+  const todayKey = getDayKey(new Date());
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = getDayKey(yesterday);
+
+  let currentStreak = 0;
+  const lastDay = uniqueDays[uniqueDays.length - 1];
+
+  if (lastDay === todayKey || lastDay === yesterdayKey) {
+    currentStreak = 1;
+
+    for (let i = uniqueDays.length - 1; i > 0; i -= 1) {
+      const current = new Date(uniqueDays[i]);
+      const prev = new Date(uniqueDays[i - 1]);
+      const diffDays = Math.round(
+        (current.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      if (diffDays === 1) {
+        currentStreak += 1;
+      } else {
+        break;
+      }
+    }
+  }
+
+  return {
+    currentStreak,
+    bestStreak,
+    activeDays: uniqueDays.length,
+    lastActiveDate: uniqueDays[uniqueDays.length - 1] || null,
+  };
 }
 
 export const createEnrollmentRecord = async ({ studentId, courseId }) => {
@@ -292,6 +394,262 @@ export const getStudentDashboardSummary = async (studentId) => {
     certificateCount: certificates.length,
     continueLearningCourses,
   };
+};
+
+export const getStudentLearningAnalytics = async (
+  studentId,
+  { from = "", to = "" } = {}
+) => {
+  if (!studentId) {
+    throw new Error("studentId is required");
+  }
+
+  const enrollmentQuery = { studentId };
+  const eventRange = normalizeDateRange({ from, to });
+
+  if (eventRange) {
+    enrollmentQuery.createdAt = eventRange;
+  }
+
+  const enrollments = await Enrollment.find(enrollmentQuery)
+    .populate("courseId")
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  const courseIds = enrollments
+    .map((item) => item?.courseId?._id || item?.courseId)
+    .filter(Boolean);
+
+  const sharedCourseQuery = courseIds.length
+    ? { courseId: { $in: courseIds } }
+    : { courseId: { $in: [] } };
+
+  const attemptQuery = { studentId, ...sharedCourseQuery };
+  const submissionQuery = { studentId, ...sharedCourseQuery };
+  const certificateQuery = { studentId, ...sharedCourseQuery };
+
+  if (eventRange) {
+    attemptQuery.createdAt = eventRange;
+    submissionQuery.createdAt = eventRange;
+    certificateQuery.createdAt = eventRange;
+  }
+
+  const [attempts, submissions, certificates] = await Promise.all([
+    QuizAttempt.find(attemptQuery).lean(),
+    AssignmentSubmission.find(submissionQuery).lean(),
+    Certificate.find(certificateQuery).lean(),
+  ]);
+
+  const totalCourses = enrollments.length;
+  const completedCourses = enrollments.filter((item) => item.completed).length;
+  const inProgressCourses = enrollments.filter(
+    (item) => !item.completed && Number(item.progress || 0) > 0
+  ).length;
+  const notStartedCourses = Math.max(
+    0,
+    totalCourses - completedCourses - inProgressCourses
+  );
+
+  const averageProgress = totalCourses
+    ? Math.round(
+        enrollments.reduce((sum, item) => sum + Number(item.progress || 0), 0) /
+          totalCourses
+      )
+    : 0;
+
+  const totalQuizAttempts = attempts.length;
+  const averageQuizScore = totalQuizAttempts
+    ? Math.round(
+        attempts.reduce((sum, item) => sum + Number(item.score || 0), 0) /
+          totalQuizAttempts
+      )
+    : 0;
+  const quizPassRate = totalQuizAttempts
+    ? Math.round(
+        (attempts.filter((item) => item.passed).length / totalQuizAttempts) * 100
+      )
+    : 0;
+
+  const totalAssignmentsSubmitted = submissions.length;
+  const gradedAssignmentsCount = submissions.filter(
+    (item) => item.status === "graded"
+  ).length;
+
+  const certificateCount = certificates.length;
+
+  const estimatedLearningMinutes = Math.round(
+    enrollments.reduce((sum, item) => {
+      const durationMinutes = Number(item?.courseId?.duration || 0);
+      const progress = Number(item?.progress || 0);
+      return sum + (durationMinutes * progress) / 100;
+    }, 0)
+  );
+
+  const estimatedLearningHours = Number(
+    (estimatedLearningMinutes / 60).toFixed(1)
+  );
+
+  const activityDateValues = [
+    ...enrollments.map((item) => item.updatedAt || item.createdAt),
+    ...attempts.map((item) => item.submittedAt || item.createdAt),
+    ...submissions.map((item) => item.submittedAt || item.createdAt),
+    ...certificates.map((item) => item.issuedAt || item.createdAt),
+  ].filter(Boolean);
+
+  const streak = calculateStreakStats(activityDateValues);
+
+  const monthlyTrend = buildRecentMonthBuckets(6, to || null);
+  const monthlyBucketMap = new Map(monthlyTrend.map((item) => [item.key, item]));
+
+  enrollments.forEach((item) => {
+    const key = getMonthKey(item.createdAt);
+    if (monthlyBucketMap.has(key)) {
+      monthlyBucketMap.get(key).enrollments += 1;
+    }
+  });
+
+  attempts.forEach((item) => {
+    const key = getMonthKey(item.submittedAt || item.createdAt);
+    if (monthlyBucketMap.has(key)) {
+      monthlyBucketMap.get(key).quizAttempts += 1;
+    }
+  });
+
+  submissions.forEach((item) => {
+    const key = getMonthKey(item.submittedAt || item.createdAt);
+    if (monthlyBucketMap.has(key)) {
+      monthlyBucketMap.get(key).submissions += 1;
+    }
+  });
+
+  const weeklyTrend = buildRecentWeekBuckets(7, to || null);
+  const weeklyBucketMap = new Map(weeklyTrend.map((item) => [item.key, item]));
+
+  attempts.forEach((item) => {
+    const key = getDayKey(item.submittedAt || item.createdAt);
+    if (weeklyBucketMap.has(key)) {
+      weeklyBucketMap.get(key).activities += 1;
+      weeklyBucketMap.get(key).quizAttempts += 1;
+    }
+  });
+
+  submissions.forEach((item) => {
+    const key = getDayKey(item.submittedAt || item.createdAt);
+    if (weeklyBucketMap.has(key)) {
+      weeklyBucketMap.get(key).activities += 1;
+      weeklyBucketMap.get(key).submissions += 1;
+    }
+  });
+
+  enrollments.forEach((item) => {
+    const key = getDayKey(item.updatedAt || item.createdAt);
+    if (weeklyBucketMap.has(key)) {
+      weeklyBucketMap.get(key).activities += 1;
+
+      const durationMinutes = Number(item?.courseId?.duration || 0);
+      const progress = Number(item?.progress || 0);
+      const estimatedHours = Number(
+        (((durationMinutes * progress) / 100) / 60).toFixed(1)
+      );
+
+      weeklyBucketMap.get(key).learningHours += estimatedHours;
+    }
+  });
+
+  const completionRate = totalCourses
+    ? Math.round((completedCourses / totalCourses) * 100)
+    : 0;
+
+  return {
+    totalCourses,
+    completedCourses,
+    inProgressCourses,
+    notStartedCourses,
+    completionRate,
+    averageProgress,
+    totalQuizAttempts,
+    averageQuizScore,
+    quizPassRate,
+    totalAssignmentsSubmitted,
+    gradedAssignmentsCount,
+    certificateCount,
+    estimatedLearningMinutes,
+    estimatedLearningHours,
+    currentStreak: streak.currentStreak,
+    bestStreak: streak.bestStreak,
+    activeDays: streak.activeDays,
+    lastActiveDate: streak.lastActiveDate,
+    weeklyTrend,
+    monthlyTrend,
+    filters: {
+      from: from || "",
+      to: to || "",
+    },
+  };
+};
+
+export const getStudentLearningAnalyticsCsv = async (
+  studentId,
+  { from = "", to = "" } = {}
+) => {
+  const analytics = await getStudentLearningAnalytics(studentId, { from, to });
+
+  const rows = [
+    ["Section", "Metric", "Value", "Extra"],
+    ["Filter", "From", analytics.filters?.from || "", ""],
+    ["Filter", "To", analytics.filters?.to || "", ""],
+    ["Summary", "Total Courses", analytics.totalCourses, ""],
+    ["Summary", "Completed Courses", analytics.completedCourses, ""],
+    ["Summary", "In Progress Courses", analytics.inProgressCourses, ""],
+    ["Summary", "Not Started Courses", analytics.notStartedCourses, ""],
+    ["Summary", "Completion Rate", `${analytics.completionRate}%`, ""],
+    ["Summary", "Average Progress", `${analytics.averageProgress}%`, ""],
+    ["Summary", "Total Quiz Attempts", analytics.totalQuizAttempts, ""],
+    ["Summary", "Average Quiz Score", analytics.averageQuizScore, ""],
+    ["Summary", "Quiz Pass Rate", `${analytics.quizPassRate}%`, ""],
+    [
+      "Summary",
+      "Assignments Submitted",
+      analytics.totalAssignmentsSubmitted,
+      "",
+    ],
+    ["Summary", "Graded Assignments", analytics.gradedAssignmentsCount, ""],
+    ["Summary", "Certificates", analytics.certificateCount, ""],
+    [
+      "Summary",
+      "Estimated Learning Minutes",
+      analytics.estimatedLearningMinutes,
+      "",
+    ],
+    [
+      "Summary",
+      "Estimated Learning Hours",
+      analytics.estimatedLearningHours,
+      "",
+    ],
+    ["Summary", "Current Streak", analytics.currentStreak, ""],
+    ["Summary", "Best Streak", analytics.bestStreak, ""],
+    ["Summary", "Active Days", analytics.activeDays, ""],
+    ["Summary", "Last Active Date", analytics.lastActiveDate || "", ""],
+    [""],
+    ["Weekly Trend", "Day", "Activities", "Quiz / Submission / Hours"],
+    ...analytics.weeklyTrend.map((item) => [
+      "Weekly Trend",
+      item.label || item.key,
+      item.activities || 0,
+      `${item.quizAttempts || 0} / ${item.submissions || 0} / ${item.learningHours || 0}`,
+    ]),
+    [""],
+    ["Monthly Trend", "Month", "Enrollments", "Quiz / Submission"],
+    ...analytics.monthlyTrend.map((item) => [
+      "Monthly Trend",
+      item.label || item.key,
+      item.enrollments || 0,
+      `${item.quizAttempts || 0} / ${item.submissions || 0}`,
+    ]),
+  ];
+
+  return `\uFEFF${toCsv(rows)}`;
 };
 
 export const getInstructorDashboardSummary = async (

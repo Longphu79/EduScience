@@ -2,6 +2,10 @@ import Certificate from "./certificate.model.js";
 import Enrollment from "../enrollment/enrollment.model.js";
 import Course from "../course/course.model.js";
 import User from "../user/user.model.js";
+import {
+  awardXp,
+  XP_RULES,
+} from "../gamification/gamification.service.js";
 
 function generateCertificateCode(courseId, studentId) {
   const coursePart = String(courseId).slice(-6).toUpperCase();
@@ -76,6 +80,15 @@ export const generateCertificate = async ({
     courseTitle: course.title || "Completed Course",
     completionDate: enrollment.completedAt || enrollment.updatedAt || new Date(),
     issuedAt: new Date(),
+  });
+
+  await awardXp({
+    studentId,
+    type: "earn_certificate",
+    xpEarned: XP_RULES.EARN_CERTIFICATE,
+    sourceId: cert._id,
+    sourceType: "Certificate",
+    meta: { courseId },
   });
 
   return Certificate.findById(cert._id)

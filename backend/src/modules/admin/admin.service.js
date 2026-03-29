@@ -4,6 +4,11 @@ import Course from "../course/course.model.js";
 import Enrollment from "../enrollment/enrollment.model.js";
 import Review from "../review/review.model.js";
 import Certificate from "../certificate/certificate.model.js";
+import QuizAttempt from "../quiz/quizAttempt.model.js";
+import AssignmentSubmission from "../assignment/assignmentSubmission.model.js";
+import Material from "../material/material.model.js";
+import Quiz from "../quiz/quiz.model.js";
+import Assignment from "../assignment/assignment.model.js";
 
 const normalizeSortOrder = (sortOrder = "desc") => {
   return sortOrder === "asc" ? 1 : -1;
@@ -82,6 +87,15 @@ function toCsv(rows = []) {
   return rows
     .map((row) => row.map((cell) => escapeCsvValue(cell)).join(","))
     .join("\n");
+}
+
+function toSafeObjectId(value) {
+  if (!value) return null;
+  if (value instanceof mongoose.Types.ObjectId) return value;
+  if (mongoose.Types.ObjectId.isValid(value)) {
+    return new mongoose.Types.ObjectId(value);
+  }
+  return null;
 }
 
 export const getDashboardStats = async ({ from, to } = {}) => {
@@ -581,59 +595,73 @@ export const getUserDetail = async (userId) => {
 
     const courseIds = courses.map((c) => c._id);
 
-    const enrollmentsCount = courseIds.length
-      ? await Enrollment.countDocuments({ courseId: { $in: courseIds } })
-      : 0;
+    const [
+      enrollmentsCount,
+      publishedCoursesCount,
+      certificatesCount,
+      materialsCount,
+      quizzesCount,
+      assignmentsCount,
+    ] = await Promise.all([
+      courseIds.length
+        ? Enrollment.countDocuments({ courseId: { $in: courseIds } })
+        : 0,
+      courseIds.length
+        ? Course.countDocuments({
+            instructorId: userId,
+            status: "published",
+          })
+        : 0,
+      courseIds.length
+        ? Certificate.countDocuments({ instructorId: userId })
+        : 0,
+      courseIds.length
+        ? Material.countDocuments({ courseId: { $in: courseIds } })
+        : 0,
+      courseIds.length ? Quiz.countDocuments({ courseId: { $in: courseIds } }) : 0,
+      courseIds.length
+        ? Assignment.countDocuments({ courseId: { $in: courseIds } })
+        : 0,
+    ]);
 
     extra = {
       courses,
       summary: {
         totalCourses: courses.length,
-        publishedCourses: courses.filter((c) => c.status === "published").length,
-        draftCourses: courses.filter((c) => c.status === "draft").length,
-        archivedCourses: courses.filter((c) => c.status === "archived").length,
-        totalStudents: enrollmentsCount,
+        publishedCourses: publishedCoursesCount,
+        totalEnrollments: enrollmentsCount,
+        certificatesCount,
+        totalMaterials: materialsCount,
+        totalQuizzes: quizzesCount,
+        totalAssignments: assignmentsCount,
       },
     };
   }
 
   return {
-    user,
+    ...user,
     ...extra,
   };
 };
 
-export const setUserActiveStatus = async (
-  userId,
-  isActive,
-  currentAdminId = null
-) => {
+export const setUserActiveStatus = async (userId, isActive, currentAdminId) => {
   const user = await User.findById(userId);
-
   if (!user) {
     throw new Error("User not found");
   }
 
-  if (
-    currentAdminId &&
-    String(user._id) === String(currentAdminId) &&
-    isActive === false
-  ) {
+  if (String(user._id) === String(currentAdminId)) {
     throw new Error("You cannot deactivate your own account");
   }
 
-  if (
-    user.role === "admin" &&
-    currentAdminId &&
-    String(user._id) !== String(currentAdminId)
-  ) {
+  if (user.role === "admin") {
     throw new Error("Cannot change active status of another admin");
   }
 
-  user.isActive = isActive;
+  user.isActive = !!isActive;
   await user.save();
 
-  return user.toObject();
+  return User.findById(userId).select("-password").lean();
 };
 
 export const getCourses = async ({
@@ -641,8 +669,7 @@ export const getCourses = async ({
   limit = 10,
   search = "",
   status = "",
-  level = "",
-  pricing = "",
+  category = "",
   instructorId = "",
   sortBy = "createdAt",
   sortOrder = "desc",
@@ -653,22 +680,18 @@ export const getCourses = async ({
   const createdAtRange = normalizeDateRange({ from, to });
 
   if (status) query.status = status;
-  if (level) query.level = level;
-  if (createdAtRange) query.createdAt = createdAtRange;
-
+  if (category) query.category = category;
   if (instructorId && mongoose.Types.ObjectId.isValid(instructorId)) {
     query.instructorId = instructorId;
   }
-
-  if (pricing === "free") query.isFree = true;
-  if (pricing === "paid") query.isFree = false;
+  if (createdAtRange) query.createdAt = createdAtRange;
 
   if (search?.trim()) {
     query.$or = [
       { title: { $regex: search.trim(), $options: "i" } },
-      { slug: { $regex: search.trim(), $options: "i" } },
-      { category: { $regex: search.trim(), $options: "i" } },
       { shortDescription: { $regex: search.trim(), $options: "i" } },
+      { description: { $regex: search.trim(), $options: "i" } },
+      { category: { $regex: search.trim(), $options: "i" } },
     ];
   }
 
@@ -676,11 +699,10 @@ export const getCourses = async ({
     "createdAt",
     "updatedAt",
     "title",
+    "status",
     "price",
     "rating",
     "totalEnrollments",
-    "status",
-    "level",
   ];
   const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : "createdAt";
   const safeSortOrder = normalizeSortOrder(sortOrder);
@@ -691,7 +713,7 @@ export const getCourses = async ({
 
   const [items, total] = await Promise.all([
     Course.find(query)
-      .populate("instructorId", "username fullName email avatarUrl isActive")
+      .populate("instructorId", "username fullName email avatarUrl role isActive")
       .sort({ [safeSortBy]: safeSortOrder })
       .skip(skip)
       .limit(safeLimit)
@@ -710,8 +732,7 @@ export const getCourses = async ({
     filters: {
       search,
       status,
-      level,
-      pricing,
+      category,
       instructorId,
       sortBy: safeSortBy,
       sortOrder: sortOrder === "asc" ? "asc" : "desc",
@@ -723,38 +744,358 @@ export const getCourses = async ({
 
 export const getCourseDetail = async (courseId) => {
   const course = await Course.findById(courseId)
-    .populate("instructorId", "username fullName email avatarUrl isActive")
+    .populate("instructorId", "username fullName email avatarUrl role isActive")
+    .populate("lessonIds")
     .lean();
 
   if (!course) {
     throw new Error("Course not found");
   }
 
-  const enrollmentsCount = await Enrollment.countDocuments({ courseId });
+  const [enrollments, materials, quizzes, assignments] = await Promise.all([
+    Enrollment.find({ courseId }).lean(),
+    Material.find({ courseId }).lean(),
+    Quiz.find({ courseId }).lean(),
+    Assignment.find({ courseId }).lean(),
+  ]);
 
   return {
-    course,
-    summary: {
-      enrollmentsCount,
+    ...course,
+    analytics: {
+      totalStudents: new Set(enrollments.map((item) => String(item.studentId))).size,
+      totalEnrollments: enrollments.length,
+      completedEnrollments: enrollments.filter((item) => item.completed).length,
+      averageProgress: enrollments.length
+        ? Math.round(
+            enrollments.reduce(
+              (sum, item) => sum + Number(item.progress || 0),
+              0
+            ) / enrollments.length
+          )
+        : 0,
+      totalMaterials: materials.length,
+      totalQuizzes: quizzes.length,
+      totalAssignments: assignments.length,
     },
   };
 };
 
 export const setCourseStatus = async (courseId, status) => {
-  const allowedStatuses = ["draft", "published", "archived"];
-
-  if (!allowedStatuses.includes(status)) {
+  const allowed = ["draft", "published", "archived"];
+  if (!allowed.includes(status)) {
     throw new Error("Invalid course status");
   }
 
-  const course = await Course.findById(courseId);
+  const updated = await Course.findByIdAndUpdate(
+    courseId,
+    { status },
+    { new: true }
+  )
+    .populate("instructorId", "username fullName email avatarUrl role isActive")
+    .lean();
 
-  if (!course) {
+  if (!updated) {
     throw new Error("Course not found");
   }
 
-  course.status = status;
-  await course.save();
+  return updated;
+};
 
-  return course.toObject();
+function sortLeaderboardItems(items = [], sortBy = "students") {
+  const safeSortBy = String(sortBy || "students");
+
+  const getPrimaryValue = (item) => {
+    switch (safeSortBy) {
+      case "rating":
+        return Number(item.averageRating || 0);
+      case "revenue":
+        return Number(item.estimatedRevenue || 0);
+      case "completionRate":
+        return Number(item.completionRate || 0);
+      case "quizScore":
+        return Number(item.averageQuizScore || 0);
+      case "students":
+      default:
+        return Number(item.totalStudents || 0);
+    }
+  };
+
+  return [...items].sort((a, b) => {
+    const primaryDiff = getPrimaryValue(b) - getPrimaryValue(a);
+    if (primaryDiff !== 0) return primaryDiff;
+
+    if (Number(b.totalEnrollments || 0) !== Number(a.totalEnrollments || 0)) {
+      return Number(b.totalEnrollments || 0) - Number(a.totalEnrollments || 0);
+    }
+
+    if (Number(b.estimatedRevenue || 0) !== Number(a.estimatedRevenue || 0)) {
+      return Number(b.estimatedRevenue || 0) - Number(a.estimatedRevenue || 0);
+    }
+
+    return Number(b.totalCourses || 0) - Number(a.totalCourses || 0);
+  });
+}
+
+export const getInstructorLeaderboard = async ({
+  sortBy = "students",
+  from = "",
+  to = "",
+  limit = 10,
+} = {}) => {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 10, 100));
+  const createdAtRange = normalizeDateRange({ from, to });
+
+  const courseQuery = { instructorId: { $ne: null } };
+  if (createdAtRange) {
+    courseQuery.createdAt = createdAtRange;
+  }
+
+  const courses = await Course.find(courseQuery)
+    .select(
+      "_id title instructorId status price salePrice isFree rating totalReviews createdAt"
+    )
+    .populate("instructorId", "username fullName email avatarUrl role isActive")
+    .lean();
+
+  const instructorIds = [
+    ...new Set(
+      courses
+        .map((course) => String(course.instructorId?._id || course.instructorId || ""))
+        .filter(Boolean)
+    ),
+  ];
+
+  if (!instructorIds.length) {
+    return {
+      items: [],
+      topThree: [],
+      sortBy: sortBy || "students",
+      filters: { from: from || "", to: to || "" },
+      pagination: { limit: safeLimit, totalItems: 0 },
+    };
+  }
+
+  const courseIds = courses.map((course) => course._id);
+
+  const eventRange = normalizeDateRange({ from, to });
+
+  const enrollmentQuery = { courseId: { $in: courseIds } };
+  const reviewQuery = { courseId: { $in: courseIds } };
+  const quizAttemptQuery = { courseId: { $in: courseIds } };
+
+  if (eventRange) {
+    enrollmentQuery.createdAt = eventRange;
+    reviewQuery.createdAt = eventRange;
+    quizAttemptQuery.createdAt = eventRange;
+  }
+
+  const [enrollments, reviews, quizAttempts] = await Promise.all([
+    Enrollment.find(enrollmentQuery)
+      .select("courseId studentId progress completed createdAt completedAt")
+      .lean(),
+    Review.find(reviewQuery).select("courseId rating createdAt").lean(),
+    QuizAttempt.find(quizAttemptQuery)
+      .select("courseId score passed submittedAt createdAt")
+      .lean(),
+  ]);
+
+  const courseMap = new Map(courses.map((course) => [String(course._id), course]));
+  const courseIdsByInstructor = new Map();
+  const leaderboardMap = new Map();
+
+  courses.forEach((course) => {
+    const instructorId = String(course.instructorId?._id || course.instructorId || "");
+    if (!instructorId) return;
+
+    if (!courseIdsByInstructor.has(instructorId)) {
+      courseIdsByInstructor.set(instructorId, []);
+    }
+    courseIdsByInstructor.get(instructorId).push(String(course._id));
+
+    if (!leaderboardMap.has(instructorId)) {
+      leaderboardMap.set(instructorId, {
+        instructorId,
+        fullName:
+          course.instructorId?.fullName ||
+          course.instructorId?.username ||
+          course.instructorId?.email ||
+          "Instructor",
+        email: course.instructorId?.email || "",
+        avatarUrl: course.instructorId?.avatarUrl || "",
+        isActive: course.instructorId?.isActive !== false,
+        totalCourses: 0,
+        publishedCourses: 0,
+        totalStudents: 0,
+        totalEnrollments: 0,
+        estimatedRevenue: 0,
+        completionRate: 0,
+        averageQuizScore: 0,
+        averageRating: 0,
+        totalReviews: 0,
+        totalQuizAttempts: 0,
+      });
+    }
+
+    const item = leaderboardMap.get(instructorId);
+    item.totalCourses += 1;
+    if (course.status === "published") {
+      item.publishedCourses += 1;
+    }
+  });
+
+  const uniqueStudentsByInstructor = new Map();
+  const completionCounterByInstructor = new Map();
+  const enrollCounterByInstructor = new Map();
+  const reviewAggByInstructor = new Map();
+  const quizAggByInstructor = new Map();
+
+  enrollments.forEach((enrollment) => {
+    const course = courseMap.get(String(enrollment.courseId));
+    if (!course) return;
+
+    const instructorId = String(course.instructorId?._id || course.instructorId || "");
+    if (!leaderboardMap.has(instructorId)) return;
+
+    if (!uniqueStudentsByInstructor.has(instructorId)) {
+      uniqueStudentsByInstructor.set(instructorId, new Set());
+    }
+    uniqueStudentsByInstructor.get(instructorId).add(String(enrollment.studentId));
+
+    enrollCounterByInstructor.set(
+      instructorId,
+      (enrollCounterByInstructor.get(instructorId) || 0) + 1
+    );
+
+    if (enrollment.completed) {
+      completionCounterByInstructor.set(
+        instructorId,
+        (completionCounterByInstructor.get(instructorId) || 0) + 1
+      );
+    }
+
+    const item = leaderboardMap.get(instructorId);
+    item.estimatedRevenue += getCourseEffectivePrice(course);
+  });
+
+  reviews.forEach((review) => {
+    const course = courseMap.get(String(review.courseId));
+    if (!course) return;
+
+    const instructorId = String(course.instructorId?._id || course.instructorId || "");
+    if (!reviewAggByInstructor.has(instructorId)) {
+      reviewAggByInstructor.set(instructorId, {
+        sum: 0,
+        count: 0,
+      });
+    }
+
+    const current = reviewAggByInstructor.get(instructorId);
+    current.sum += Number(review.rating || 0);
+    current.count += 1;
+  });
+
+  quizAttempts.forEach((attempt) => {
+    const course = courseMap.get(String(attempt.courseId));
+    if (!course) return;
+
+    const instructorId = String(course.instructorId?._id || course.instructorId || "");
+    if (!quizAggByInstructor.has(instructorId)) {
+      quizAggByInstructor.set(instructorId, {
+        sum: 0,
+        count: 0,
+      });
+    }
+
+    const current = quizAggByInstructor.get(instructorId);
+    current.sum += Number(attempt.score || 0);
+    current.count += 1;
+  });
+
+  let items = [...leaderboardMap.values()].map((item) => {
+    const uniqueStudents = uniqueStudentsByInstructor.get(item.instructorId);
+    const enrollmentsCount = enrollCounterByInstructor.get(item.instructorId) || 0;
+    const completedCount = completionCounterByInstructor.get(item.instructorId) || 0;
+    const reviewAgg = reviewAggByInstructor.get(item.instructorId) || {
+      sum: 0,
+      count: 0,
+    };
+    const quizAgg = quizAggByInstructor.get(item.instructorId) || {
+      sum: 0,
+      count: 0,
+    };
+
+    return {
+      ...item,
+      totalStudents: uniqueStudents ? uniqueStudents.size : 0,
+      totalEnrollments: enrollmentsCount,
+      completionRate: enrollmentsCount
+        ? Math.round((completedCount / enrollmentsCount) * 100)
+        : 0,
+      averageRating: reviewAgg.count
+        ? Number((reviewAgg.sum / reviewAgg.count).toFixed(1))
+        : 0,
+      totalReviews: reviewAgg.count,
+      averageQuizScore: quizAgg.count
+        ? Math.round(quizAgg.sum / quizAgg.count)
+        : 0,
+      totalQuizAttempts: quizAgg.count,
+      estimatedRevenue: Math.round(item.estimatedRevenue || 0),
+    };
+  });
+
+  items = sortLeaderboardItems(items, sortBy).map((item, index) => ({
+    ...item,
+    rank: index + 1,
+  }));
+
+  return {
+    items: items.slice(0, safeLimit),
+    topThree: items.slice(0, 3),
+    sortBy: sortBy || "students",
+    filters: {
+      from: from || "",
+      to: to || "",
+    },
+    pagination: {
+      limit: safeLimit,
+      totalItems: items.length,
+    },
+  };
+};
+
+export const getInstructorLeaderboardCsv = async ({
+  sortBy = "students",
+  from = "",
+  to = "",
+  limit = 50,
+} = {}) => {
+  const leaderboard = await getInstructorLeaderboard({
+    sortBy,
+    from,
+    to,
+    limit,
+  });
+
+  const rows = [
+    ["Section", "Metric", "Value", "Extra"],
+    ["Filter", "Sort By", leaderboard.sortBy || "students", ""],
+    ["Filter", "From", leaderboard.filters?.from || "", ""],
+    ["Filter", "To", leaderboard.filters?.to || "", ""],
+    ["Filter", "Total Items", leaderboard.pagination?.totalItems || 0, ""],
+    [""],
+    [
+      "Leaderboard",
+      "Rank",
+      "Instructor",
+      "Students / Enrollments / Revenue / Rating / Completion / Quiz",
+    ],
+    ...leaderboard.items.map((item) => [
+      "Instructor",
+      item.rank || 0,
+      item.fullName || "Instructor",
+      `${item.totalStudents || 0} / ${item.totalEnrollments || 0} / ${item.estimatedRevenue || 0} / ${item.averageRating || 0} / ${item.completionRate || 0}% / ${item.averageQuizScore || 0}`,
+    ]),
+  ];
+
+  return `\uFEFF${toCsv(rows)}`;
 };

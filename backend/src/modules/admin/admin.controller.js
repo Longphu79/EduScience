@@ -63,6 +63,65 @@ export const exportDashboardPdf = async (req, res) => {
   }
 };
 
+export const getInstructorLeaderboard = async (req, res) => {
+  try {
+    const {
+      sortBy = "students",
+      from = "",
+      to = "",
+      limit = 10,
+    } = req.query;
+
+    const data = await adminService.getInstructorLeaderboard({
+      sortBy,
+      from,
+      to,
+      limit,
+    });
+
+    return sendSuccess(res, {
+      message: "Get instructor leaderboard successfully",
+      data,
+    });
+  } catch (error) {
+    return sendError(res, {
+      statusCode: 500,
+      message: error.message || "Failed to fetch instructor leaderboard",
+    });
+  }
+};
+
+export const exportInstructorLeaderboardCsv = async (req, res) => {
+  try {
+    const {
+      sortBy = "students",
+      from = "",
+      to = "",
+      limit = 50,
+    } = req.query;
+
+    const csv = await adminService.getInstructorLeaderboardCsv({
+      sortBy,
+      from,
+      to,
+      limit,
+    });
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="admin-instructor-leaderboard.csv"'
+    );
+
+    return res.status(200).send(csv);
+  } catch (error) {
+    return sendError(res, {
+      statusCode: 500,
+      message: error.message || "Failed to export instructor leaderboard csv",
+    });
+  }
+};
+
 export const getUsers = async (req, res) => {
   try {
     const result = await adminService.getUsers(req.query);

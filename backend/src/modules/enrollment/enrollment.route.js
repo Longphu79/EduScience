@@ -9,6 +9,8 @@ import {
   getStudentsByCourse,
   getStudentProgressDetail,
   getStudentDashboardSummary,
+  getStudentAnalytics,
+  exportStudentAnalyticsCsv,
   getInstructorDashboardSummary,
   exportInstructorDashboardCsv,
   exportInstructorDashboardPdf,
@@ -19,7 +21,22 @@ const router = express.Router();
 
 router.post("/enroll", verifyToken, enrollCourse);
 
-router.get("/dashboard/student/:studentId", verifyToken, getStudentDashboardSummary);
+router.get(
+  "/dashboard/student/:studentId",
+  verifyToken,
+  getStudentDashboardSummary
+);
+router.get(
+  "/dashboard/student/:studentId/analytics",
+  verifyToken,
+  getStudentAnalytics
+);
+router.get(
+  "/dashboard/student/:studentId/export/csv",
+  verifyToken,
+  exportStudentAnalyticsCsv
+);
+
 router.get(
   "/dashboard/instructor/:instructorId",
   verifyToken,

@@ -10,6 +10,15 @@ router.get("/dashboard", adminController.getDashboard);
 router.get("/dashboard/export/csv", adminController.exportDashboardCsv);
 router.get("/dashboard/export/pdf", adminController.exportDashboardPdf);
 
+router.get(
+  "/instructors/leaderboard",
+  adminController.getInstructorLeaderboard
+);
+router.get(
+  "/instructors/leaderboard/export/csv",
+  adminController.exportInstructorLeaderboardCsv
+);
+
 router.get("/users", adminController.getUsers);
 router.get("/users/:userId", adminController.getUserDetail);
 router.patch("/users/:userId/deactivate", adminController.deactivateUser);
