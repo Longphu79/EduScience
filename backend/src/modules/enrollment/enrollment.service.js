@@ -7,6 +7,10 @@ import AssignmentSubmission from "../assignment/assignmentSubmission.model.js";
 import Certificate from "../certificate/certificate.model.js";
 import ChatConversation from "../chat/chatConversation.model.js";
 import Material from "../material/material.model.js";
+import {
+  awardXp,
+  XP_RULES,
+} from "../gamification/gamification.service.js";
 
 const lessonPopulateConfig = {
   path: "lessonIds",
@@ -53,6 +57,19 @@ function normalizeDateRange({ from, to } = {}) {
   }
 
   return Object.keys(range).length ? range : null;
+}
+
+function isDateInRange(dateValue, range) {
+  if (!range) return true;
+  if (!dateValue) return false;
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return false;
+
+  if (range.$gte && date < range.$gte) return false;
+  if (range.$lte && date > range.$lte) return false;
+
+  return true;
 }
 
 function getMonthKey(dateValue) {
@@ -279,48 +296,110 @@ export const enrollCourse = async ({ studentId, courseId }) => {
   return await createEnrollmentRecord({ studentId, courseId });
 };
 
-export const getStudentDashboardSummary = async (studentId) => {
+export const getStudentDashboardSummary = async (
+  studentId,
+  { from = "", to = "" } = {}
+) => {
   if (!studentId) {
     throw new Error("studentId is required");
   }
 
-  const enrollments = await Enrollment.find({ studentId })
+  const eventRange = normalizeDateRange({ from, to });
+
+  const allEnrollments = await Enrollment.find({ studentId })
     .populate({
       path: "courseId",
       populate: [{ path: "instructorId" }, lessonPopulateConfig],
     })
     .sort({ updatedAt: -1 });
 
-  const courseIds = enrollments
+  const allCourseIds = allEnrollments
     .map((item) => item?.courseId?._id || item?.courseId)
     .filter(Boolean);
 
+  const scopeEnrollments = eventRange
+    ? allEnrollments.filter((item) => {
+        return (
+          isDateInRange(item.createdAt, eventRange) ||
+          isDateInRange(item.updatedAt, eventRange) ||
+          isDateInRange(item.completedAt, eventRange)
+        );
+      })
+    : allEnrollments;
+
+  const scopeCourseIds = [
+    ...new Set(
+      scopeEnrollments
+        .map((item) => item?.courseId?._id || item?.courseId)
+        .filter(Boolean)
+        .map(String)
+    ),
+  ];
+
+  const quizQuery = {
+    courseId: { $in: scopeCourseIds },
+    isPublished: true,
+  };
+
+  const assignmentQuery = {
+    courseId: { $in: scopeCourseIds },
+    isPublished: true,
+  };
+
+  const attemptQuery = {
+    studentId,
+    courseId: { $in: scopeCourseIds },
+  };
+
+  const submissionQuery = {
+    studentId,
+    courseId: { $in: scopeCourseIds },
+  };
+
+  const certificateQuery = {
+    studentId,
+    courseId: { $in: allCourseIds },
+  };
+
+  if (eventRange) {
+    attemptQuery.createdAt = eventRange;
+    submissionQuery.createdAt = eventRange;
+    certificateQuery.createdAt = eventRange;
+  }
+
   const [quizzes, attempts, assignments, submissions, certificates] =
     await Promise.all([
-      Quiz.find({ courseId: { $in: courseIds }, isPublished: true }).lean(),
-      QuizAttempt.find({ studentId, courseId: { $in: courseIds } }).lean(),
-      Assignment.find({
-        courseId: { $in: courseIds },
-        isPublished: true,
-      }).lean(),
-      AssignmentSubmission.find({
-        studentId,
-        courseId: { $in: courseIds },
-      }).lean(),
-      Certificate.find({ studentId, courseId: { $in: courseIds } }).lean(),
+      Quiz.find(quizQuery).lean(),
+      QuizAttempt.find(attemptQuery).lean(),
+      Assignment.find(assignmentQuery).lean(),
+      AssignmentSubmission.find(submissionQuery).lean(),
+      Certificate.find(certificateQuery).lean(),
     ]);
 
-  const totalEnrolledCourses = enrollments.length;
+  const totalEnrolledCourses = eventRange
+    ? allEnrollments.filter((item) => isDateInRange(item.createdAt, eventRange))
+        .length
+    : allEnrollments.length;
 
-  const totalCompletedCourses = enrollments.filter(
-    (item) => item.completed
-  ).length;
+  const totalCompletedCourses = eventRange
+    ? allEnrollments.filter(
+        (item) => item.completed && isDateInRange(item.completedAt, eventRange)
+      ).length
+    : allEnrollments.filter((item) => item.completed).length;
 
-  const totalInProgressCourses = enrollments.filter(
-    (item) => !item.completed && Number(item.progress || 0) > 0
-  ).length;
+  const totalInProgressCourses = eventRange
+    ? allEnrollments.filter(
+        (item) =>
+          !item.completed &&
+          Number(item.progress || 0) > 0 &&
+          (isDateInRange(item.createdAt, eventRange) ||
+            isDateInRange(item.updatedAt, eventRange))
+      ).length
+    : allEnrollments.filter(
+        (item) => !item.completed && Number(item.progress || 0) > 0
+      ).length;
 
-  const totalLessonCount = enrollments.reduce((sum, item) => {
+  const totalLessonCount = scopeEnrollments.reduce((sum, item) => {
     const lessons = Array.isArray(item?.courseId?.lessonIds)
       ? item.courseId.lessonIds.length
       : 0;
@@ -328,7 +407,7 @@ export const getStudentDashboardSummary = async (studentId) => {
     return sum + lessons;
   }, 0);
 
-  const totalCompletedLessons = enrollments.reduce((sum, item) => {
+  const totalCompletedLessons = scopeEnrollments.reduce((sum, item) => {
     const completed = Array.isArray(item?.completedLessons)
       ? item.completedLessons.length
       : 0;
@@ -360,7 +439,7 @@ export const getStudentDashboardSummary = async (studentId) => {
     (assignment) => !submissionMap.has(String(assignment._id))
   ).length;
 
-  const continueLearningCourses = enrollments
+  const continueLearningCourses = allEnrollments
     .filter((item) => item?.courseId)
     .map((item) => ({
       enrollmentId: item._id,
@@ -393,6 +472,10 @@ export const getStudentDashboardSummary = async (studentId) => {
     pendingAssignmentCount,
     certificateCount: certificates.length,
     continueLearningCourses,
+    filters: {
+      from: from || "",
+      to: to || "",
+    },
   };
 };
 
@@ -1106,7 +1189,9 @@ export const completeLesson = async ({ studentId, courseId, lessonId }) => {
     ? enrollment.completedLessons.map((item) => toStringId(item))
     : [];
 
-  if (!existingCompletedIds.includes(lessonIdStr)) {
+  const wasAlreadyCompleted = existingCompletedIds.includes(lessonIdStr);
+
+  if (!wasAlreadyCompleted) {
     enrollment.completedLessons.push(lessonId);
   }
 
@@ -1118,6 +1203,7 @@ export const completeLesson = async ({ studentId, courseId, lessonId }) => {
 
   const totalLessons = publishedLessons.length;
   const progress = calcProgress(totalLessons, completedUniqueCount);
+  const wasCompletedBefore = !!enrollment.completed;
 
   enrollment.progress = progress;
   enrollment.completed =
@@ -1132,6 +1218,28 @@ export const completeLesson = async ({ studentId, courseId, lessonId }) => {
   }
 
   await enrollment.save();
+
+  if (!wasAlreadyCompleted) {
+    await awardXp({
+      studentId,
+      type: "complete_lesson",
+      xpEarned: XP_RULES.COMPLETE_LESSON,
+      sourceId: lessonId,
+      sourceType: "Lesson",
+      meta: { courseId },
+    });
+  }
+
+  if (!wasCompletedBefore && enrollment.completed) {
+    await awardXp({
+      studentId,
+      type: "complete_course",
+      xpEarned: XP_RULES.COMPLETE_COURSE,
+      sourceId: courseId,
+      sourceType: "Course",
+      meta: { completedLessonsCount: completedUniqueCount },
+    });
+  }
 
   return Enrollment.findById(enrollment._id).populate({
     path: "courseId",

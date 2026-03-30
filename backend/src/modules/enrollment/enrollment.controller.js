@@ -90,6 +90,7 @@ export const getStudentDashboardSummary = async (req, res) => {
     const requesterId = getUserId(req);
     const requesterRole = getUserRole(req);
     const { studentId } = req.params;
+    const { from = "", to = "" } = req.query;
 
     if (!requesterId) {
       return sendError(res, {
@@ -108,7 +109,10 @@ export const getStudentDashboardSummary = async (req, res) => {
       });
     }
 
-    const data = await enrollmentService.getStudentDashboardSummary(studentId);
+    const data = await enrollmentService.getStudentDashboardSummary(studentId, {
+      from,
+      to,
+    });
 
     return sendSuccess(res, {
       message: "Get student dashboard summary successfully",
