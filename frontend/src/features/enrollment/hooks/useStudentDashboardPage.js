@@ -5,6 +5,10 @@ import {
   getStudentAnalytics,
   getStudentDashboardSummary,
 } from "../services/enrollment.service";
+import {
+  getStudentGamification,
+  getStudentGamificationEvents,
+} from "../services/gamification.service";
 import { getUserId } from "../utils/enrollment.helpers";
 
 function getTodayString() {
@@ -23,6 +27,8 @@ export default function useStudentDashboardPage() {
 
   const [summary, setSummary] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [gamification, setGamification] = useState(null);
+  const [gamificationEvents, setGamificationEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     from: getDateDaysAgoString(30),
@@ -39,6 +45,8 @@ export default function useStudentDashboardPage() {
         if (!studentId) {
           setSummary(null);
           setAnalytics(null);
+          setGamification(null);
+          setGamificationEvents([]);
           setLoading(false);
           return;
         }
@@ -47,13 +55,22 @@ export default function useStudentDashboardPage() {
 
         const finalFilters = overrideFilters || filters;
 
-        const [summaryResponse, analyticsResponse] = await Promise.all([
-          getStudentDashboardSummary(studentId),
+        const [
+          summaryResponse,
+          analyticsResponse,
+          gamificationResponse,
+          eventsResponse,
+        ] = await Promise.all([
+          getStudentDashboardSummary(studentId, finalFilters),
           getStudentAnalytics(studentId, finalFilters),
+          getStudentGamification(studentId),
+          getStudentGamificationEvents(studentId, 8),
         ]);
 
         setSummary(enrollmentUnwrap(summaryResponse) || null);
         setAnalytics(enrollmentUnwrap(analyticsResponse) || null);
+        setGamification(gamificationResponse || null);
+        setGamificationEvents(Array.isArray(eventsResponse) ? eventsResponse : []);
       } catch (error) {
         setToast({
           message: error?.message || "Failed to load student dashboard",
@@ -61,6 +78,8 @@ export default function useStudentDashboardPage() {
         });
         setSummary(null);
         setAnalytics(null);
+        setGamification(null);
+        setGamificationEvents([]);
       } finally {
         setLoading(false);
       }
@@ -141,6 +160,8 @@ export default function useStudentDashboardPage() {
     loading,
     summary,
     analytics,
+    gamification,
+    gamificationEvents,
     continueCourses,
     weeklyTrend,
     monthlyTrend,

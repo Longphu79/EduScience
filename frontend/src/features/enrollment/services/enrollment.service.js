@@ -207,13 +207,13 @@ export async function getStudentProgressDetail(courseId, studentId) {
   );
 }
 
-export async function getStudentDashboardSummary(studentId) {
+export async function getStudentDashboardSummary(studentId, params = {}) {
   if (!studentId) {
     throw new Error("studentId is required");
   }
 
   return apiGet(
-    `/enrollment/dashboard/student/${studentId}`,
+    `/enrollment/dashboard/student/${studentId}${buildQuery(params)}`,
     "Failed to fetch student dashboard"
   );
 }
