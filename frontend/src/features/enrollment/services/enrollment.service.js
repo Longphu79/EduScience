@@ -30,6 +30,18 @@ async function parseJsonSafe(res) {
 
 async function request(path, options = {}, fallbackMessage = "Request failed") {
     const res = await fetch(`${API_BASE_URL}${path}`, options);
+
+    if (options?.responseType === "blob") {
+        if (!res.ok) {
+            const data = await parseJsonSafe(res);
+            const error = new Error(data?.message || fallbackMessage);
+            error.status = res.status;
+            error.payload = data;
+            throw error;
+        }
+        return res.blob();
+    }
+
     const data = await parseJsonSafe(res);
 
     if (!res.ok) {
@@ -50,12 +62,36 @@ function createJsonRequestOptions(method, body) {
     };
 }
 
+function buildQuery(params = {}) {
+    const filtered = Object.fromEntries(
+        Object.entries(params).filter(
+            ([, value]) =>
+                value !== undefined && value !== null && value !== "",
+        ),
+    );
+
+    const query = new URLSearchParams(filtered).toString();
+    return query ? `?${query}` : "";
+}
+
 async function apiGet(path, fallbackMessage) {
     return request(
         path,
         {
             method: "GET",
             headers: createHeaders(),
+        },
+        fallbackMessage,
+    );
+}
+
+async function apiGetBlob(path, fallbackMessage) {
+    return request(
+        path,
+        {
+            method: "GET",
+            headers: createHeaders(),
+            responseType: "blob",
         },
         fallbackMessage,
     );
@@ -172,24 +208,72 @@ export async function getStudentProgressDetail(courseId, studentId) {
     );
 }
 
-export async function getStudentDashboardSummary(studentId) {
+export async function getStudentDashboardSummary(studentId, params = {}) {
     if (!studentId) {
         throw new Error("studentId is required");
     }
 
     return apiGet(
-        `/api/enrollment/dashboard/student/${studentId}`,
+        `/api/enrollment/dashboard/student/${studentId}${buildQuery(params)}`,
         "Failed to fetch student dashboard",
     );
 }
 
-export async function getInstructorDashboardSummary(instructorId) {
+export async function getStudentAnalytics(studentId, params = {}) {
+    if (!studentId) {
+        throw new Error("studentId is required");
+    }
+
+    return apiGet(
+        `/api/enrollment/dashboard/student/${studentId}/analytics${buildQuery(params)}`,
+        "Failed to fetch student learning analytics",
+    );
+}
+
+export async function exportStudentAnalyticsCsv(studentId, params = {}) {
+    if (!studentId) {
+        throw new Error("studentId is required");
+    }
+
+    return apiGetBlob(
+        `/api/enrollment/dashboard/student/${studentId}/export/csv${buildQuery(params)}`,
+        "Failed to export student analytics csv",
+    );
+}
+
+export async function getInstructorDashboardSummary(instructorId, params = {}) {
     if (!instructorId) {
         throw new Error("instructorId is required");
     }
 
     return apiGet(
-        `/api/enrollment/dashboard/instructor/${instructorId}`,
+        `/api/enrollment/dashboard/instructor/${instructorId}${buildQuery(params)}`,
         "Failed to fetch instructor dashboard",
+    );
+}
+
+export async function exportInstructorDashboardCsv(instructorId, params = {}) {
+    if (!instructorId) {
+        throw new Error("instructorId is required");
+    }
+
+    return apiGetBlob(
+        `/api/enrollment/dashboard/instructor/${instructorId}/export/csv${buildQuery(
+            params,
+        )}`,
+        "Failed to export instructor dashboard csv",
+    );
+}
+
+export async function exportInstructorDashboardPdf(instructorId, params = {}) {
+    if (!instructorId) {
+        throw new Error("instructorId is required");
+    }
+
+    return apiGetBlob(
+        `/api/enrollment/dashboard/instructor/${instructorId}/export/pdf${buildQuery(
+            params,
+        )}`,
+        "Failed to export instructor dashboard pdf",
     );
 }

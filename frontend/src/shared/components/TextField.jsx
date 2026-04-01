@@ -6,6 +6,7 @@ export default function TextField({
     type = "text",
     value,
     onChange,
+    onBlur, // Thêm prop này
     placeholder,
     autoComplete,
     error,
@@ -25,6 +26,7 @@ export default function TextField({
                     type={type}
                     value={value}
                     onChange={onChange}
+                    onBlur={onBlur} // Gán sự kiện onBlur vào đây
                     placeholder={placeholder}
                     autoComplete={autoComplete}
                 />

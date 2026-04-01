@@ -4,6 +4,7 @@ import {
   getMaterialId,
 } from "../utils/material.helpers";
 
+
 export default function MaterialListItem({
   item,
   index = 0,

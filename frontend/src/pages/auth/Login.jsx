@@ -17,6 +17,13 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [toast, setToast] = useState("");
 
+    // 1. Thêm state touched để kiểm soát việc hiện lỗi
+    const [touched, setTouched] = useState({
+        username: false,
+        password: false,
+    });
+
+    // 2. Chỉ khai báo errors MỘT LẦN DUY NHẤT
     const errors = useMemo(() => {
         const e = {};
         if (!username.trim()) e.username = "Please enter your username";
@@ -26,8 +33,17 @@ export default function Login() {
 
     const canSubmit = Object.keys(errors).length === 0 && !loading;
 
+    // 3. Hàm xử lý khi người dùng click ra ngoài ô input
+    const handleBlur = (field) => {
+        setTouched((prev) => ({ ...prev, [field]: true }));
+    };
+
     const onSubmit = async (ev) => {
         ev.preventDefault();
+
+        // Khi nhấn submit, hiện lỗi của tất cả các ô nếu còn trống
+        setTouched({ username: true, password: true });
+
         if (!canSubmit) return;
 
         setLoading(true);
@@ -61,9 +77,11 @@ export default function Login() {
                     label="Username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    onBlur={() => handleBlur("username")} // Thêm onBlur
                     placeholder="e.g. cuong.dev"
                     autoComplete="username"
-                    error={username.trim() ? "" : errors.username}
+                    // Sửa logic: Chỉ hiện lỗi khi đã bị "touched"
+                    error={touched.username ? errors.username : ""}
                 />
 
                 <TextField
@@ -71,9 +89,11 @@ export default function Login() {
                     type={showPass ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onBlur={() => handleBlur("password")} // Thêm onBlur
                     placeholder="Your password"
                     autoComplete="current-password"
-                    error={password ? "" : errors.password}
+                    // Sửa logic: Chỉ hiện lỗi khi đã bị "touched"
+                    error={touched.password ? errors.password : ""}
                     right={
                         <button
                             type="button"

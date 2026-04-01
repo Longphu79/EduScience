@@ -1,0 +1,13 @@
+import express from "express";
+import * as walletController from "./wallet.controller.js";
+import { verifyToken } from "../../middlewares/auth.middleware.js";
+
+const router = express.Router();
+
+router.get("/my-wallet", verifyToken, walletController.getMyWallet);
+router.post("/withdraw", verifyToken, walletController.createWithdrawalRequest);
+// Route cho Student
+router.post("/deposit", verifyToken, walletController.createDeposit);
+router.get("/deposit/history", verifyToken, walletController.getMyDeposits);
+
+export default router;

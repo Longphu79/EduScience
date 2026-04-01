@@ -19,6 +19,9 @@ import uploadRoute from "./modules/upload/upload.route.js";
 import orderRoute from "./modules/checkout/order.route.js";
 import webhookRoute from "./modules/checkout/webhook.route.js";
 import checkoutRoute from "./modules/checkout/checkout.route.js";
+import walletRoute from "./modules/wallet/wallet.route.js";
+import transactionRoute from "./modules/transaction/transaction.route.js";
+import gamificationRoute from "./modules/gamification/gamification.route.js";
 
 import { notFoundMiddleware } from "./middlewares/notFound.middleware.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
@@ -86,6 +89,9 @@ app.use("/api/upload", uploadRoute);
 app.use("/api/order", orderRoute);
 app.use("/api/webhook", webhookRoute);
 app.use("/api/checkout", checkoutRoute);
+app.use("/api/wallet", walletRoute);
+app.use("/api/transaction", transactionRoute);
+app.use("/api/gamification", gamificationRoute);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

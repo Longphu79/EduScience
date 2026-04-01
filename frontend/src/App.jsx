@@ -6,9 +6,13 @@ import {
     Outlet,
 } from "react-router-dom";
 import { MainLayout } from "./layouts/MainLayout";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+// import ForgotPassword from "./pages/auth/ForgotPassword";
+// import ResetPassword from "./pages/auth/ResetPassword";
 import Home from "./pages/home/home";
 
 import AllCoursesPage from "./features/course/pages/AllCoursesPage";
@@ -42,6 +46,9 @@ import CourseChatPage from "./features/chat/pages/CourseChatPage";
 import CourseCertificatePage from "./features/certificate/pages/CourseCertificatePage";
 import PublicCertificatePage from "./features/certificate/pages/PublicCertificatePage";
 import CartPage from "./features/cart/pages/CartPage";
+import WalletPage from "./features/wallet/pages/WalletPage";
+import TransactionPage from "./features/transaction/pages/TransactionPage";
+import DepositPage from "./features/wallet/pages/DepositPage";
 
 import ProfilePage from "./features/user/pages/ProfilePage";
 import UserProfilePage from "./features/user/pages/UserProfilePage";
@@ -53,7 +60,8 @@ import AdminUsersPage from "./features/admin/pages/AdminUsersPage";
 import AdminCoursesPage from "./features/admin/pages/AdminCoursesPage";
 import AdminUserDetailPage from "./features/admin/pages/AdminUserDetailPage";
 import AdminCourseDetailPage from "./features/admin/pages/AdminCourseDetailPage";
-
+import AdminWithdrawalsPage from "./features/admin/pages/AdminWithdrawalsPage";
+import AdminDepositManager from "./features/admin/pages/DepositManager";
 import CourseReviewsPage from "./features/review/pages/CourseReviewsPage";
 
 import FeaturesPage from "./pages/features/Features";
@@ -119,6 +127,18 @@ function PublicOnlyRoute() {
 function App() {
     return (
         <BrowserRouter>
+            <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop={false}
+                closeOnClick
+                rtl={false}
+                pauseOnFocusLoss
+                draggable
+                pauseOnHover
+                theme="colored"
+            />
             <Routes>
                 <Route path="/" element={<MainLayout />}>
                     <Route index element={<Home />} />
@@ -168,6 +188,11 @@ function App() {
                             path="courses/:courseId/chat"
                             element={<CourseChatPage />}
                         />
+                        <Route path="wallet" element={<WalletPage />} />
+                        <Route
+                            path="transactions"
+                            element={<TransactionPage />}
+                        />
                     </Route>
 
                     <Route element={<RequireRole allowRoles={["student"]} />}>
@@ -201,6 +226,7 @@ function App() {
                             path="/checkout/:orderId"
                             element={<CheckoutPage />}
                         />
+                        <Route path="deposit" element={<DepositPage />} />
                     </Route>
 
                     <Route
@@ -285,6 +311,10 @@ function App() {
                             element={<AdminUserDetailPage />}
                         />
                         <Route
+                            path="admin/withdrawals"
+                            element={<AdminWithdrawalsPage />}
+                        />
+                        <Route
                             path="admin/courses"
                             element={<AdminCoursesPage />}
                         />
@@ -292,12 +322,24 @@ function App() {
                             path="admin/courses/:courseId"
                             element={<AdminCourseDetailPage />}
                         />
+                        <Route
+                            path="admin/deposits"
+                            element={<AdminDepositManager />}
+                        />
                     </Route>
                 </Route>
 
                 <Route element={<PublicOnlyRoute />}>
                     <Route path="/auth/login" element={<Login />} />
                     <Route path="/auth/register" element={<Register />} />
+                    {/* <Route
+                        path="/auth/forgot-password"
+                        element={<ForgotPassword />}
+                    />
+                    <Route
+                        path="/auth/reset-password"
+                        element={<ResetPassword />}
+                    /> */}
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />
