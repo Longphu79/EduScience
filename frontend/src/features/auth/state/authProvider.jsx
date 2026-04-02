@@ -39,47 +39,44 @@ export default function AuthProvider({ children }) {
             localStorage.setItem("token", nextToken);
             localStorage.setItem("user", JSON.stringify(nextUser));
 
-            setToken(nextToken); // Cập nhật state token
-            setUser(nextUser); // Cập nhật state user -> Đây là lúc Header sẽ đổi màu/hiện menu
+            setToken(nextToken);
+            setUser(nextUser);
             return;
         }
-        // Nếu dữ liệu sai, xóa sạch
+
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        setToken(null);
+        setUser(null);
     };
 
-    const login = async ({ username, password }) => {
+    const login = async ({ email, password }) => {
         try {
-            const apiResponse = await loginApi({ username, password });
+            const apiResponse = await loginApi({ email, password });
 
-            // TRƯỚC ĐÓ: apiResponse?.token (SAI)
-            // BÂY GIỜ: Phải vào trong data mới thấy token
-            const token = apiResponse?.data?.token;
+            const nextToken = apiResponse?.data?.token;
+            const nextUser = apiResponse?.data?.user;
 
-            // User cũng nằm trong data
-            const user = apiResponse?.data?.user;
-            if (token && user) {
-                persistAuth(token, user);
-                console.log("CHÚC MỪNG: ĐÃ LƯU THÀNH CÔNG!");
-            } else {
-                console.error("Vẫn thiếu dữ liệu! Check lại: ", apiResponse);
+            if (!nextToken || !nextUser) {
+                throw new Error("Login response is invalid");
             }
 
+            persistAuth(nextToken, nextUser);
             return apiResponse;
         } catch (error) {
-            console.error("Lỗi login:", error);
+            console.error("Login error:", error);
             throw error;
         }
     };
 
     const register = async (payload) => {
-        const responseData = await registerApi(payload);
-
-        const token = responseData?.token;
-        const user = responseData?.data?.user;
-
-        persistAuth(token, user);
-        return responseData;
+        try {
+            const apiResponse = await registerApi(payload);
+            return apiResponse;
+        } catch (error) {
+            console.error("Register error:", error);
+            throw error;
+        }
     };
 
     const updateCurrentUser = (nextUser) => {
@@ -104,8 +101,8 @@ export default function AuthProvider({ children }) {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
 
-        setToken(null); // Đặt lại state token về null
-        setUser(null); // Đặt lại state user về null
+        setToken(null);
+        setUser(null);
     };
 
     const value = useMemo(

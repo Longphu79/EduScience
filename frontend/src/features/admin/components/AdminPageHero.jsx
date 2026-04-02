@@ -1,42 +1,50 @@
-import { Link, useLocation } from "react-router-dom";
-import "../styles/admin-tabs.css";
+import React from "react";
 
-const tabs = [
-  { label: "Dashboard", to: "/admin/dashboard" },
-  { label: "Users", to: "/admin/users" },
-  { label: "Courses", to: "/admin/courses" },
-];
-
-function isActiveTab(pathname, to) {
-  if (to === "/admin/dashboard") {
-    return pathname === "/admin/dashboard";
-  }
-
-  return pathname.startsWith(to);
-}
-
-export default function AdminTabs() {
-  const location = useLocation();
-
+export default function AdminPageHero({
+  title,
+  description,
+  actions = null,
+}) {
   return (
-    <div className="admin-tabs">
-      <div className="admin-tabs__list">
-        {tabs.map((tab) => {
-          const active = isActiveTab(location.pathname, tab.to);
+    <section className="admin-page-hero">
+      <div className="admin-page-hero__glow admin-page-hero__glow--one" />
+      <div className="admin-page-hero__glow admin-page-hero__glow--two" />
 
-          return (
-            <Link
-              key={tab.to}
-              to={tab.to}
-              className={`admin-tabs__item ${
-                active ? "admin-tabs__item--active" : ""
-              }`}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
+      <div className="admin-page-hero__content">
+        <div className="admin-page-hero__left">
+          <div className="admin-page-hero__eyebrow">Admin control center</div>
+
+          <h1 className="admin-page-hero__title">{title}</h1>
+
+          {description ? (
+            <p className="admin-page-hero__description">{description}</p>
+          ) : null}
+
+          <div className="admin-page-hero__meta">
+            <div className="admin-page-hero__meta-card">
+              <span className="admin-page-hero__meta-label">
+                Real-time oversight
+              </span>
+              <strong className="admin-page-hero__meta-value">
+                Users, courses, revenue
+              </strong>
+            </div>
+
+            <div className="admin-page-hero__meta-card">
+              <span className="admin-page-hero__meta-label">
+                Admin workflow
+              </span>
+              <strong className="admin-page-hero__meta-value">
+                Review, approve, optimize
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        {actions ? (
+          <div className="admin-page-hero__actions">{actions}</div>
+        ) : null}
       </div>
-    </div>
+    </section>
   );
 }

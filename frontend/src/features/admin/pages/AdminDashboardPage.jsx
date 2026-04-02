@@ -21,7 +21,7 @@ import AdminDashboardLoadingState from "../components/AdminDashboardLoadingState
 import AdminDashboardChartsSection from "../components/AdminDashboardChartsSection";
 import AdminInstructorLeaderboardSection from "../components/AdminInstructorLeaderboardSection";
 import "../styles/admin-dashboard-page.css";
-
+import "../styles/admin-page-hero.css";
 function downloadBlob(blob, filename) {
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");

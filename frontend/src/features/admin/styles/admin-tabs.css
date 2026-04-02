@@ -1,36 +1,65 @@
 .admin-tabs {
-  border: 1px solid #e2e8f0;
-  border-radius: 24px;
-  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(16px);
+  border-radius: 28px;
   padding: 12px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
 }
 
 .admin-tabs__list {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .admin-tabs__item {
-  border: 1px solid #e2e8f0;
-  background: #ffffff;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 16px;
+  border: 1px solid #dbe4ee;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   color: #334155;
   text-decoration: none;
-  border-radius: 18px;
-  padding: 12px 16px;
   font-size: 14px;
-  font-weight: 600;
-  transition: 0.2s ease;
+  font-weight: 800;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease,
+    background 0.22s ease,
+    color 0.22s ease;
 }
 
 .admin-tabs__item:hover {
-  background: #f8fafc;
+  transform: translateY(-1px);
+  border-color: rgba(79, 70, 229, 0.16);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
 }
 
 .admin-tabs__item--active {
-  border-color: transparent;
-  background: linear-gradient(to right, #ef4444, #f43f5e);
   color: #ffffff;
-  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.18);
+  border-color: transparent;
+  background: linear-gradient(135deg, #fb7185 0%, #ef4444 100%);
+  box-shadow: 0 18px 28px rgba(239, 68, 68, 0.22);
+}
+
+@media (max-width: 640px) {
+  .admin-tabs {
+    border-radius: 22px;
+    padding: 10px;
+  }
+
+  .admin-tabs__list {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-tabs__item {
+    width: 100%;
+  }
 }

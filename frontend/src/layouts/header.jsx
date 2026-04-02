@@ -30,6 +30,21 @@ const baseNavItems = [
     { label: "About Us", to: "/aboutus" },
 ];
 
+function normalizeUserRole(user) {
+    const rawRole =
+        user?.role?.name ||
+        user?.role?.code ||
+        user?.role?.role ||
+        user?.role ||
+        user?.userRole ||
+        "";
+
+    const normalized = String(rawRole).trim().toLowerCase();
+
+    if (normalized === "administrator") return "admin";
+    return normalized;
+}
+
 export function Header() {
     const [mobileOpen, setMobileOpen] = useState(false);
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -43,7 +58,7 @@ export function Header() {
     const navigate = useNavigate();
 
     const currentUserId = user?._id || user?.id || user?.userId || null;
-    const userRole = user?.role?.toLowerCase?.() || "";
+    const userRole = normalizeUserRole(user);
 
     const isInstructor = isAuthenticated && userRole === "instructor";
     const isStudent = isAuthenticated && userRole === "student";

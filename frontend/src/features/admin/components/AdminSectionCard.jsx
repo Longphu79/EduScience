@@ -10,11 +10,15 @@ export default function AdminSectionCard({
         <div>
           <h2 className="admin-dashboard-section-card__title">{title}</h2>
           {subtitle ? (
-            <p className="admin-dashboard-section-card__subtitle">{subtitle}</p>
+            <p className="admin-dashboard-section-card__subtitle">
+              {subtitle}
+            </p>
           ) : null}
         </div>
 
-        {action ? <div>{action}</div> : null}
+        {action ? (
+          <div className="admin-dashboard-section-card__action">{action}</div>
+        ) : null}
       </div>
 
       <div className="admin-dashboard-section-card__body">{children}</div>

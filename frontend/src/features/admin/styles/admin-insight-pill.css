@@ -1,72 +1,79 @@
 .admin-insight-pill__link {
-  display: block;
   text-decoration: none;
+  color: inherit;
+  display: block;
 }
 
 .admin-insight-pill {
-  border: 1px solid;
-  border-radius: 20px;
-  padding: 16px;
-  transition: 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  min-height: 128px;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 20px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.admin-insight-pill::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.2), rgba(6, 182, 212, 0.65));
 }
 
 .admin-insight-pill:hover {
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  transform: translateY(-4px);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.09);
 }
 
 .admin-insight-pill__label {
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  opacity: 0.8;
+  letter-spacing: 0.14em;
+  margin-bottom: 14px;
 }
 
 .admin-insight-pill__value {
-  margin-top: 8px;
-  font-size: 20px;
+  font-size: 2.15rem;
+  line-height: 1;
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
 }
 
 .admin-insight-pill__hint {
-  margin-top: 8px;
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.admin-insight-pill--slate {
-  background: #f1f5f9;
-  color: #334155;
-  border-color: #e2e8f0;
-}
-
-.admin-insight-pill--indigo {
-  background: #e0e7ff;
-  color: #4338ca;
-  border-color: #c7d2fe;
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 .admin-insight-pill--emerald {
-  background: #d1fae5;
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border-color: rgba(16, 185, 129, 0.18);
   color: #047857;
-  border-color: #a7f3d0;
 }
 
 .admin-insight-pill--amber {
-  background: #fef3c7;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.14) 0%, rgba(245, 158, 11, 0.08) 100%);
+  border-color: rgba(245, 158, 11, 0.18);
   color: #b45309;
-  border-color: #fde68a;
-}
-
-.admin-insight-pill--rose {
-  background: #ffe4e6;
-  color: #be123c;
-  border-color: #fecdd3;
 }
 
 .admin-insight-pill--red {
-  background: #fee2e2;
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.14) 0%, rgba(244, 63, 94, 0.08) 100%);
+  border-color: rgba(244, 63, 94, 0.18);
   color: #b91c1c;
-  border-color: #fecaca;
+}
+
+.admin-insight-pill--indigo,
+.admin-insight-pill--slate {
+  background: linear-gradient(180deg, rgba(79, 70, 229, 0.12) 0%, rgba(79, 70, 229, 0.08) 100%);
+  border-color: rgba(79, 70, 229, 0.16);
+  color: #4338ca;
 }

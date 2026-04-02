@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthShell from "../../features/auth/components/AuthShell.jsx";
 import TextField from "../../shared/components/TextField.jsx";
 import Button from "../../shared/components/Button.jsx";
@@ -10,30 +10,46 @@ import "../../shared/styles/controls.css";
 export default function Login() {
     const { login } = useAuth();
     const nav = useNavigate();
+    const location = useLocation();
 
-    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
     const [toast, setToast] = useState("");
+    const [isSuccess, setIsSuccess] = useState(false);
 
-    // 1. Thêm state touched để kiểm soát việc hiện lỗi
     const [touched, setTouched] = useState({
-        username: false,
+        email: false,
         password: false,
     });
 
-    // 2. Chỉ khai báo errors MỘT LẦN DUY NHẤT
+    useEffect(() => {
+        if (location.state?.registered) {
+            setIsSuccess(true);
+            setToast(location.state?.message || "Register successfully");
+            nav(location.pathname, { replace: true, state: null });
+        }
+    }, [location, nav]);
+
     const errors = useMemo(() => {
         const e = {};
-        if (!username.trim()) e.username = "Please enter your username";
-        if (!password) e.password = "Please enter your password";
+
+        if (!email.trim()) {
+            e.email = "Please enter your email";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            e.email = "Email is not valid";
+        }
+
+        if (!password) {
+            e.password = "Please enter your password";
+        }
+
         return e;
-    }, [username, password]);
+    }, [email, password]);
 
     const canSubmit = Object.keys(errors).length === 0 && !loading;
 
-    // 3. Hàm xử lý khi người dùng click ra ngoài ô input
     const handleBlur = (field) => {
         setTouched((prev) => ({ ...prev, [field]: true }));
     };
@@ -41,17 +57,19 @@ export default function Login() {
     const onSubmit = async (ev) => {
         ev.preventDefault();
 
-        // Khi nhấn submit, hiện lỗi của tất cả các ô nếu còn trống
-        setTouched({ username: true, password: true });
+        setTouched({ email: true, password: true });
 
         if (!canSubmit) return;
 
         setLoading(true);
         setToast("");
+        setIsSuccess(false);
+
         try {
-            await login({ username: username.trim(), password });
+            await login({ email: email.trim(), password });
             nav("/");
         } catch (err) {
+            setIsSuccess(false);
             setToast(err?.message || "Login failed");
         } finally {
             setLoading(false);
@@ -71,17 +89,17 @@ export default function Login() {
                 </div>
             }
         >
-            <Toast message={toast} onClose={() => setToast("")} />
+            <Toast message={toast} onClose={() => setToast("")} success={isSuccess} />
+
             <form className="form" onSubmit={onSubmit}>
                 <TextField
-                    label="Username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    onBlur={() => handleBlur("username")} // Thêm onBlur
-                    placeholder="e.g. cuong.dev"
-                    autoComplete="username"
-                    // Sửa logic: Chỉ hiện lỗi khi đã bị "touched"
-                    error={touched.username ? errors.username : ""}
+                    label="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => handleBlur("email")}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    error={touched.email ? errors.email : ""}
                 />
 
                 <TextField
@@ -89,10 +107,9 @@ export default function Login() {
                     type={showPass ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    onBlur={() => handleBlur("password")} // Thêm onBlur
+                    onBlur={() => handleBlur("password")}
                     placeholder="Your password"
                     autoComplete="current-password"
-                    // Sửa logic: Chỉ hiện lỗi khi đã bị "touched"
                     error={touched.password ? errors.password : ""}
                     right={
                         <button
@@ -110,9 +127,10 @@ export default function Login() {
                         <input id="remember" type="checkbox" />
                         <label htmlFor="remember">Remember me</label>
                     </div>
-                    <a className="link" href="#">
+
+                    <Link className="link" to="/auth/forgot-password">
                         Forgot password?
-                    </a>
+                    </Link>
                 </div>
 
                 <Button type="submit" loading={loading} disabled={!canSubmit}>

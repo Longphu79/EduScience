@@ -10,9 +10,14 @@ export default function AdminDashboardQuickActionCard({
     <Link to={to} className="admin-dashboard-quick-card">
       <div className="admin-dashboard-quick-card__top">
         <div>
+          <div className="admin-dashboard-quick-card__eyebrow">
+            Quick action
+          </div>
+
           <h3 className="admin-dashboard-quick-card__title">{title}</h3>
+
           <p className="admin-dashboard-quick-card__description">
-            {description}
+            {description || "Open this workspace and manage the related admin flow."}
           </p>
         </div>
 
@@ -21,7 +26,10 @@ export default function AdminDashboardQuickActionCard({
         />
       </div>
 
-      <div className="admin-dashboard-quick-card__cta">Open →</div>
+      <div className="admin-dashboard-quick-card__cta">
+        <span>Open</span>
+        <span aria-hidden="true">→</span>
+      </div>
     </Link>
   );
 }

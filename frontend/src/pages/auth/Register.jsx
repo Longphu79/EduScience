@@ -19,16 +19,31 @@ export default function Register() {
 
     const [loading, setLoading] = useState(false);
     const [toast, setToast] = useState("");
+    const [isSuccess, setIsSuccess] = useState(false);
 
     const errors = useMemo(() => {
         const e = {};
-        if (!username.trim()) e.username = "Please enter a username";
-        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+
+        if (!username.trim()) {
+            e.username = "Please enter a username";
+        }
+
+        if (!email.trim()) {
+            e.email = "Please enter your email";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
             e.email = "Email is not valid";
-        if (!password) e.password = "Please enter a password";
-        if (password && password.length < 6)
+        }
+
+        if (!password) {
+            e.password = "Please enter a password";
+        } else if (password.length < 6) {
             e.password = "Password must be at least 6 characters";
-        if (!role) e.role = "Please choose a role";
+        }
+
+        if (!role) {
+            e.role = "Please choose a role";
+        }
+
         return e;
     }, [username, email, password, role]);
 
@@ -36,19 +51,35 @@ export default function Register() {
 
     const onSubmit = async (ev) => {
         ev.preventDefault();
+
         if (!canSubmit) return;
 
         setLoading(true);
         setToast("");
+        setIsSuccess(false);
+
         try {
-            await register({
+            const response = await register({
                 username: username.trim(),
-                email: email.trim() ? email.trim() : undefined,
+                email: email.trim(),
                 password,
                 role,
             });
-            nav("/");
+
+            setIsSuccess(true);
+            setToast(response?.message || "Register successfully");
+
+            setTimeout(() => {
+                nav("/auth/login", {
+                    replace: true,
+                    state: {
+                        registered: true,
+                        message: response?.message || "Register successfully",
+                    },
+                });
+            }, 1200);
         } catch (err) {
+            setIsSuccess(false);
             setToast(err?.message || "Register failed");
         } finally {
             setLoading(false);
@@ -68,7 +99,8 @@ export default function Register() {
                 </div>
             }
         >
-            <Toast message={toast} onClose={() => setToast("")} />
+            <Toast message={toast} onClose={() => setToast("")} success={isSuccess} />
+
             <form className="form" onSubmit={onSubmit}>
                 <TextField
                     label="Username"
@@ -76,11 +108,11 @@ export default function Register() {
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="e.g. cuong.dev"
                     autoComplete="username"
-                    error={username.trim() ? "" : errors.username}
+                    error={errors.username || ""}
                 />
 
                 <TextField
-                    label="Email (optional)"
+                    label="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"

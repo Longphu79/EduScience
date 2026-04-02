@@ -11,8 +11,8 @@ import "react-toastify/dist/ReactToastify.css";
 
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
-// import ForgotPassword from "./pages/auth/ForgotPassword";
-// import ResetPassword from "./pages/auth/ResetPassword";
+import ForgotPasswordPage from "./features/auth/pages/ForgotPasswordPage";
+import ResetPasswordPage from "./features/auth/pages/ResetPasswordPage";
 import Home from "./pages/home/home";
 
 import AllCoursesPage from "./features/course/pages/AllCoursesPage";
@@ -70,6 +70,21 @@ import CheckoutPage from "./features/checkout/pages/CheckoutPage";
 
 import { useAuth } from "./features/auth/state/useAuth";
 
+function normalizeUserRole(user) {
+    const rawRole =
+        user?.role?.name ||
+        user?.role?.code ||
+        user?.role?.role ||
+        user?.role ||
+        user?.userRole ||
+        "";
+
+    const normalized = String(rawRole).trim().toLowerCase();
+
+    if (normalized === "administrator") return "admin";
+    return normalized;
+}
+
 function LoadingScreen() {
     return (
         <div className="mx-auto max-w-7xl px-4 py-10">
@@ -94,6 +109,7 @@ function RequireAuth() {
 
 function RequireRole({ allowRoles = [] }) {
     const { isAuthenticated, token, user, booting } = useAuth();
+    const normalizedRole = normalizeUserRole(user);
 
     if (booting) {
         return <LoadingScreen />;
@@ -103,7 +119,7 @@ function RequireRole({ allowRoles = [] }) {
         return <Navigate to="/auth/login" replace />;
     }
 
-    if (allowRoles.length > 0 && !allowRoles.includes(user?.role)) {
+    if (allowRoles.length > 0 && !allowRoles.includes(normalizedRole)) {
         return <Navigate to="/" replace />;
     }
 
@@ -139,6 +155,7 @@ function App() {
                 pauseOnHover
                 theme="colored"
             />
+
             <Routes>
                 <Route path="/" element={<MainLayout />}>
                     <Route index element={<Home />} />
@@ -332,14 +349,14 @@ function App() {
                 <Route element={<PublicOnlyRoute />}>
                     <Route path="/auth/login" element={<Login />} />
                     <Route path="/auth/register" element={<Register />} />
-                    {/* <Route
+                    <Route
                         path="/auth/forgot-password"
-                        element={<ForgotPassword />}
+                        element={<ForgotPasswordPage />}
                     />
                     <Route
                         path="/auth/reset-password"
-                        element={<ResetPassword />}
-                    /> */}
+                        element={<ResetPasswordPage />}
+                    />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

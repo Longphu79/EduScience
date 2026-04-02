@@ -19,9 +19,11 @@ const request = axios.create({
 request.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem("token") || "";
+
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
         return config;
     },
     (error) => Promise.reject(error),
@@ -30,10 +32,25 @@ request.interceptors.request.use(
 request.interceptors.response.use(
     (response) => response,
     (error) => {
+        const responseData = error?.response?.data;
+
+        const serverMessage =
+            responseData?.message ||
+            responseData?.error ||
+            responseData?.errors?.[0]?.message ||
+            error?.message ||
+            "Request failed";
+
         if (error?.response?.status === 401) {
             console.warn("Unauthorized request");
         }
-        return Promise.reject(error);
+
+        const normalizedError = new Error(serverMessage);
+        normalizedError.status = error?.response?.status || 500;
+        normalizedError.data = responseData;
+        normalizedError.originalError = error;
+
+        return Promise.reject(normalizedError);
     },
 );
 
