@@ -80,8 +80,25 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    resetPasswordToken: {
+      type: String,
+      default: null,
+    },
+
+    resetPasswordExpires: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
-export default mongoose.models.User || mongoose.model("User", userSchema);
+// Ép Mongoose bỏ model User cũ nếu đang giữ schema cũ
+if (mongoose.connection.models.User) {
+  delete mongoose.connection.models.User;
+}
+
+const User = mongoose.model("User", userSchema);
+
+export default User;

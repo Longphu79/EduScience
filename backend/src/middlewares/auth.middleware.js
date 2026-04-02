@@ -18,6 +18,20 @@ function getBearerToken(req) {
   return token;
 }
 
+function normalizeRole(roleValue) {
+  const raw =
+    roleValue?.name ||
+    roleValue?.code ||
+    roleValue?.role ||
+    roleValue ||
+    "";
+
+  const normalized = String(raw).trim().toLowerCase();
+
+  if (normalized === "administrator") return "admin";
+  return normalized;
+}
+
 export const verifyToken = async (req, res, next) => {
   try {
     const token = getBearerToken(req);
@@ -33,6 +47,8 @@ export const verifyToken = async (req, res, next) => {
 
     const userId = decoded?._id || decoded?.userId || decoded?.id || null;
 
+    console.log("[AUTH] decoded token:", decoded);
+
     if (!userId) {
       return sendError(res, {
         statusCode: 401,
@@ -40,7 +56,9 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
-    const user = await User.findById(userId).select("_id role isActive");
+    const user = await User.findById(userId).select("_id email role isActive");
+
+    console.log("[AUTH] db user:", user);
 
     if (!user) {
       return sendError(res, {
@@ -56,13 +74,19 @@ export const verifyToken = async (req, res, next) => {
       });
     }
 
+    const normalizedRole = normalizeRole(user.role);
+
     req.user = {
       _id: user._id,
       id: user._id,
       userId: user._id,
-      role: user.role,
+      email: user.email,
+      role: normalizedRole,
+      rawRole: user.role,
       isActive: user.isActive,
     };
+
+    console.log("[AUTH] req.user after normalize:", req.user);
 
     return next();
   } catch (error) {
@@ -87,6 +111,8 @@ export const requireAuth = (req, res, next) => {
 };
 
 export const requireRole = (...roles) => {
+  const allowedRoles = roles.map((role) => normalizeRole(role));
+
   return (req, res, next) => {
     if (!req.user) {
       return sendError(res, {
@@ -95,10 +121,24 @@ export const requireRole = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    const currentRole = normalizeRole(req.user.role);
+
+    console.log("[AUTH] role check:", {
+      currentRole,
+      rawRole: req.user.rawRole,
+      allowedRoles,
+      email: req.user.email,
+      userId: String(req.user.userId || ""),
+      path: req.originalUrl,
+    });
+
+    if (!allowedRoles.includes(currentRole)) {
       return sendError(res, {
         statusCode: 403,
-        message: "Forbidden",
+        message:
+          process.env.NODE_ENV === "development"
+            ? `Forbidden: currentRole=${currentRole}, rawRole=${req.user.rawRole}`
+            : "Forbidden",
       });
     }
 

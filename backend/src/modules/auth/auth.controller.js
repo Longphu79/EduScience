@@ -27,10 +27,10 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
     const result = await authService.login({
-      username,
+      email,
       password,
     });
 
@@ -42,6 +42,45 @@ export const login = async (req, res) => {
     return sendError(res, {
       statusCode: 400,
       message: err.message || "Login failed",
+    });
+  }
+};
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const result = await authService.forgotPassword({ email });
+
+    return sendSuccess(res, {
+      message: result.message,
+      data: result,
+    });
+  } catch (err) {
+    return sendError(res, {
+      statusCode: 400,
+      message: err.message || "Forgot password failed",
+    });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    const result = await authService.resetPassword({
+      token,
+      password,
+    });
+
+    return sendSuccess(res, {
+      message: result.message,
+      data: result,
+    });
+  } catch (err) {
+    return sendError(res, {
+      statusCode: 400,
+      message: err.message || "Reset password failed",
     });
   }
 };
