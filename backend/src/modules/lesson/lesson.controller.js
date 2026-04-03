@@ -2,6 +2,10 @@ import * as lessonService from "./lesson.service.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { uploadToR2 } from "./r2.service.js";
 
+const getExt = (fileName) => {
+    return fileName.substring(fileName.lastIndexOf("."));
+};
+
 function getRequester(req) {
     return {
         requesterId: req.user?._id || req.user?.userId || req.user?.id || null,
@@ -162,30 +166,38 @@ export const getLessonsByCourse = async (req, res) => {
     }
 };
 
-export const uploadCoursePreview = async (req, res) => {
-    try {
-        if (!req.file)
-            return res.status(400).json({ message: "No file uploaded" });
+// export const uploadCoursePreview = async (req, res) => {
+//     try {
+//         if (!req.file)
+//             return res.status(400).json({ message: "No file uploaded" });
 
-        const key = `courses/previews/${Date.now()}${getExt(req.file.originalname)}`;
-        const url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+//         const key = `courses/previews/${Date.now()}${getExt(req.file.originalname)}`;
+//         const url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
 
-        res.json({ url });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
+//         res.json({ url });
+//     } catch (error) {
+//         res.status(500).json({ message: error.message });
+//     }
+// };
 
 export const uploadLessonVideo = async (req, res) => {
     try {
-        if (!req.file)
+        // Kiểm tra xem middleware Multer đã nhận được file chưa
+        if (!req.file) {
             return res.status(400).json({ message: "No file uploaded" });
+        }
 
-        const key = `lessons/${Date.now()}${getExt(req.file.originalname)}`;
+        // Tạo key lưu trữ: lessons/17123456789.mp4
+        const fileName = req.file.originalname;
+        const key = `lessons/${Date.now()}${getExt(fileName)}`;
+
+        // Gọi service upload lên Cloudflare R2
         const url = await uploadToR2(req.file.buffer, key, req.file.mimetype);
 
+        // Trả về URL để frontend lưu vào database
         res.json({ url });
     } catch (error) {
+        console.error("Upload R2 Error:", error);
         res.status(500).json({ message: error.message });
     }
 };

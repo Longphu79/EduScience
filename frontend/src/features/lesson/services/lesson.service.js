@@ -137,3 +137,18 @@ export async function deleteLesson(lessonId) {
 }
 
 export const getCourseLessons = getLessonsByCourse;
+
+export async function uploadLessonVideo(file) {
+    if (!file) throw new Error("File is required");
+
+    const formData = new FormData();
+    formData.append("file", file); // Phải khớp với .single("file") ở backend
+
+    const response = await fetch(`${API_BASE_URL}/api/lesson/lesson-video`, {
+        method: "POST",
+        headers: createHeaders({}, true), // Không set Content-Type để trình duyệt tự xử lý
+        body: formData,
+    });
+
+    return handleResponse(response, "Failed to upload video to cloud");
+}
