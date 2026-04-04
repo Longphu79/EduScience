@@ -2,7 +2,11 @@ import axios from "axios";
 
 // 1. Khởi tạo cấu hình dùng chung
 const api = axios.create({
-    baseURL: "http://localhost:4000",
+  baseURL: (
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    "http://localhost:4000"
+  ).replace(/\/$/, ""),
 });
 
 // 2. Tự động đính kèm Token vào Header trước khi gửi request
