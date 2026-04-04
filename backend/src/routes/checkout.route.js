@@ -1,5 +1,5 @@
 import express from "express";
-import { authMiddleware } from "../middleware/authMiddleware.js";
+import { authMiddleware, requireRoles } from "../middleware/authMiddleware.js";
 import {
   checkout,
   getCheckoutInfo,
@@ -8,7 +8,7 @@ import {
 
 const router = express.Router();
 
-router.post("/", authMiddleware, checkout);
-router.get("/:orderId", authMiddleware, getCheckoutInfo);
+router.post("/", authMiddleware, requireRoles("student"), checkout);
+router.get("/:orderId", authMiddleware, requireRoles("student"), getCheckoutInfo);
 
 export default router;

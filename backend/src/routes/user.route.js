@@ -4,25 +4,31 @@ import {
     deactivateAccount,
     changePassword,
     updateStudentProfile,
-    updateInstructorProfile
+    updateInstructorProfile,
+    listInstructorOptions,
 } from '../controllers/user.controller.js';
-import { authMiddleware } from '../middleware/authMiddleware.js';
+import { authMiddleware, requireRoles } from '../middleware/authMiddleware.js';
 import express from 'express';
 
 
 const router = express.Router();
-router.use(authMiddleware); // Áp dụng middlewareAuth cho tất cả các route sau nó
+router.use(authMiddleware);
 
-// USER PROFILE
-router.get("/profile/:userId", authMiddleware, getProfile);
-router.put("/profile/:userId", authMiddleware, updateProfile);
-router.put("/changepassword/:userId", authMiddleware, changePassword);
-router.put("/deactivate/:userId", authMiddleware, deactivateAccount);
+router.get("/profile/me", getProfile);
+router.put("/profile/me", updateProfile);
+router.put("/changepassword", changePassword);
+router.put("/deactivate", deactivateAccount);
 
-// STUDENT PROFILE
-router.put("/student/:userId", authMiddleware, updateStudentProfile);
+router.get("/instructors/options", requireRoles("admin"), listInstructorOptions);
+router.put("/student", requireRoles("student"), updateStudentProfile);
+router.put("/instructor", requireRoles("instructor"), updateInstructorProfile);
 
-// INSTRUCTOR PROFILE
-router.put("/instructor/:userId", authMiddleware, updateInstructorProfile);
+// Backward-compatible aliases. Handlers always use the current actor.
+router.get("/profile/:userId", getProfile);
+router.put("/profile/:userId", updateProfile);
+router.put("/changepassword/:userId", changePassword);
+router.put("/deactivate/:userId", deactivateAccount);
+router.put("/student/:userId", requireRoles("student"), updateStudentProfile);
+router.put("/instructor/:userId", requireRoles("instructor"), updateInstructorProfile);
 
 export default router;

@@ -10,11 +10,10 @@ export const sepayWebhook = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    await processWebhook(req.body);
-    res.json({ success: true });
+    const result = await processWebhook(req.body);
+    res.json({ success: true, ...result });
   } catch (err) {
     console.error("Webhook error:", err.message);
-    // Always return success to prevent SePay retries on our errors
-    res.json({ success: true });
+    res.status(err.statusCode || 500).json({ success: false, message: err.message });
   }
 };

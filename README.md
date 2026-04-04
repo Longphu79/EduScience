@@ -1,65 +1,47 @@
-# EduScience - Nền tảng học trực tuyến
+# EduScience
 
-Nền tảng e-learning cho phép giảng viên tạo và quản lý khóa học, học viên mua và học trực tuyến với thanh toán QR qua SePay.
+Nền tảng e-learning với public catalog cho learner, learning workspace cho student, management workspace riêng cho instructor/admin, checkout qua SePay, và backend Express + MongoDB.
 
 ## Tech Stack
 
-| Layer          | Công nghệ                              |
-| -------------- | -------------------------------------- |
-| Frontend       | React 19 + Vite + Tailwind CSS v4     |
-| Backend        | Express 5 + Node.js                   |
-| Database       | MongoDB + Mongoose                    |
-| Authentication | JWT (jsonwebtoken + bcryptjs)          |
-| File Storage   | Cloudflare R2 (S3-compatible)          |
-| Payment        | SePay QR Gateway                       |
+| Layer | Công nghệ |
+| --- | --- |
+| Frontend chính | Next.js 16 + React 19 + Mantine 9 |
+| Backend | Express 5 + Node.js |
+| Database | MongoDB + Mongoose |
+| Authentication | JWT + Next session proxy |
+| Payment | SePay webhook flow |
+| Storage | Cloudflare R2 |
 
-## Tính năng chính
+## App Surface
 
-- **Xác thực:** Đăng ký, đăng nhập, phân quyền (Student / Instructor / Admin)
-- **Quản lý khóa học:** CRUD khóa học, bài học với upload video
-- **Upload file:** Avatar, thumbnail, video qua Cloudflare R2
-- **Giỏ hàng & Wishlist:** Thêm/xóa khóa học
-- **Thanh toán:** QR code chuyển khoản ngân hàng qua SePay, webhook xác nhận tự động
-- **Hồ sơ người dùng:** Cập nhật thông tin, đổi mật khẩu, vô hiệu hóa tài khoản
+- Public client app: landing page, catalog, course detail
+- Student app: `my-learning`, lesson detail, comments, notes, bookmarks, reviews, reminders, certificate
+- Instructor app: overview, course management, authoring workspace, payout workspace
+- Admin app: overview, moderation queue, payout queue, payout ledger
 
-## Yêu cầu
+## Cài đặt
 
-- **Node.js** >= 18
-- **MongoDB** (local hoặc MongoDB Atlas)
-- **npm** hoặc **yarn**
-
-## Cài đặt & Chạy
-
-### 1. Clone repo
-
-```bash
-git clone git@github.com:Longphu79/EduScience.git
-cd EduScience
-```
-
-### 2. Cài đặt Backend
+### 1. Backend
 
 ```bash
 cd backend
 npm install
 ```
 
-Tạo file `backend/.env`:
+Tạo `backend/.env`:
 
 ```env
 PORT=4000
 MONGO_URI=mongodb://localhost:27017/edu_scienceDB
-
 JWT_SECRET=your_jwt_secret
 
-# Cloudflare R2
 R2_ACCOUNT_ID=your_r2_account_id
 R2_ACCESS_KEY_ID=your_r2_access_key
 R2_SECRET_ACCESS_KEY=your_r2_secret_key
 R2_BUCKET_NAME=your_bucket_name
 R2_PUBLIC_URL=your_r2_public_url
 
-# SePay Payment
 SEPAY_MERCHANT_ID=your_merchant_id
 SEPAY_SECRET_KEY=your_secret_key
 SEPAY_WEBHOOK_KEY=your_webhook_key
@@ -70,79 +52,75 @@ SEPAY_BANK_NAME=your_bank_name
 Chạy backend:
 
 ```bash
-# Development (auto-reload)
 npm run dev
-
-# Production
-npm start
 ```
 
-Backend chạy tại `http://localhost:4000`
+Backend mặc định ở `http://localhost:4000`.
 
-### 3. Cài đặt Frontend
+### 2. Frontend chính
 
 ```bash
 cd frontend
 npm install
 ```
 
-Tạo file `frontend/.env`:
-
-```env
-VITE_API_URL=http://localhost:4000
-```
-
 Chạy frontend:
 
 ```bash
-npm run dev
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4000 npm run dev
 ```
 
-Frontend chạy tại `http://localhost:5173`
+Frontend mặc định ở `http://localhost:3000`.
 
-## API Endpoints
+## QA Accounts
 
-| Method | Endpoint          | Mô tả                        |
-| ------ | ----------------- | ----------------------------- |
-| POST   | `/auth/register`  | Đăng ký tài khoản             |
-| POST   | `/auth/login`     | Đăng nhập                     |
-| GET    | `/course`         | Danh sách khóa học            |
-| POST   | `/course`         | Tạo khóa học mới              |
-| GET    | `/course/:slug`   | Chi tiết khóa học             |
-| GET    | `/api/cart`       | Xem giỏ hàng                  |
-| POST   | `/api/cart`       | Thêm vào giỏ hàng             |
-| POST   | `/api/checkout`   | Tạo đơn hàng & QR thanh toán  |
-| GET    | `/api/order/:id`  | Trạng thái đơn hàng           |
-| POST   | `/api/upload/*`   | Upload file (avatar/video/thumbnail) |
-| POST   | `/api/webhook/sepay` | Webhook xác nhận thanh toán |
-| GET    | `/wishlist`       | Xem wishlist                   |
+Sau khi seed QA data:
+
+```bash
+cd backend
+npm run seed:qa
+```
+
+Password chung:
+
+```text
+QaDemo123!
+```
+
+Accounts:
+
+- Student: `qa.student`
+- Instructor: `qa.instructor`
+- Admin: `qa.admin`
+- Alternate instructor: `qa.instructor.alt`
+
+Chi tiết manual workflow xem tại [docs/qa-role-workflows.md](/Users/duongthanhphu/EduScience/docs/qa-role-workflows.md).
+
+## Test Commands
+
+Backend:
+
+```bash
+cd backend
+npm test
+npm run test:integration
+npm run test:e2e
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run build
+npm run test:e2e
+```
 
 ## Cấu trúc thư mục
 
-```
+```text
 EduScience/
 ├── backend/
-│   ├── src/
-│   │   ├── config/        # Database & JWT config
-│   │   ├── controllers/   # Request handlers
-│   │   ├── middleware/     # Auth & upload middleware
-│   │   ├── models/        # Mongoose schemas
-│   │   ├── routes/        # API routes
-│   │   ├── services/      # Business logic
-│   │   └── app.js         # Entry point
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── features/      # Feature modules (auth, cart, course, ...)
-│   │   ├── pages/         # Page components
-│   │   ├── layouts/       # Header, Footer, MainLayout
-│   │   ├── shared/        # Shared components
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   └── package.json
-└── README.md
+├── frontend/         # Next.js app chính
+├── docs/
+└── openspec/
 ```
-
-## Team
-
-Dự án được phát triển bởi nhóm EduScience.

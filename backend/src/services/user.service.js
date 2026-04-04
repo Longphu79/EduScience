@@ -1,8 +1,9 @@
-import User from "../models/user.js";
+import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import Student from "../models/Student.js";
 import Instructor from "../models/Instructor.js";
 import mongoose from "mongoose";
+import { createHttpError } from "../utils/httpError.js";
 
 export const getUserById = async (userId) => {
     return await User.findById(userId);
@@ -12,7 +13,7 @@ export const getUserById = async (userId) => {
 export const getProfile = async (userId) => {
     const user = await User.findById(userId).lean();
     if (!user) {
-        throw new Error("User not found");
+        throw createHttpError(404, "User not found");
     }
 
     let profileData = null;
@@ -39,6 +40,10 @@ export const updateProfile = async (userId, data) => {
     });
 
     const user = await User.findByIdAndUpdate(userId, updateData, { new: true });
+    if (!user) {
+        throw createHttpError(404, "User not found");
+    }
+
     return user;
 }
 
@@ -46,23 +51,25 @@ export const updateProfile = async (userId, data) => {
 export const changePassword = async (userId, oldPassword, newPassword) => {
     const user = await User.findById(userId).select("+password");
     if (!user) {
-        throw new Error("User not found");
+        throw createHttpError(404, "User not found");
     }
     const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) {
-        throw new Error("Old password is incorrect");
+        throw createHttpError(400, "Old password is incorrect");
     }
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
-    console.log("Password changed for user:", userId);
-    console.log("Old Password:", oldPassword);
-    console.log("New Password:", newPassword);
     return true;
 }
 
 // deactive account
 export const deactivateAccount = async(userId) =>{
-    return await User.findByIdAndUpdate(userId,{isActive: false}, {new: true});
+    const user = await User.findByIdAndUpdate(userId,{isActive: false}, {new: true});
+    if (!user) {
+        throw createHttpError(404, "User not found");
+    }
+
+    return user;
 }
 
 // Student profile
@@ -81,8 +88,6 @@ export const updateStudentProfile = async(userId, data) =>{
         { $set: updateData },
         { new: true }
     );
-    console.log("userId:", userId);
-    console.log("updateData:", updateData);
     return student;
 }
 
@@ -102,14 +107,28 @@ export const updateInstructorProfile = async(userId, data) => {
         { $set: updateData },
         { new: true }
     );
-    console.log("userId:", userId);
-    console.log("updateData:", updateData);
     return instructor;
 
 }
 
+export const listInstructorOptions = async () => {
+    const instructors = await Instructor.find()
+        .select("name userId")
+        .populate({
+            path: "userId",
+            select: "username email",
+        })
+        .sort({ name: 1 })
+        .lean();
 
-
+    return instructors.map((instructor) => ({
+        _id: instructor._id,
+        name: instructor.name,
+        userId: instructor.userId?._id ?? instructor.userId ?? null,
+        username: instructor.userId?.username ?? "",
+        email: instructor.userId?.email ?? "",
+    }));
+}
 
 
 

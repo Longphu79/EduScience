@@ -9,6 +9,11 @@ const orderItemSchema = new mongoose.Schema(
     },
     title: String,
     price: Number,
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
   },
   { _id: false }
 );
@@ -26,6 +31,11 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
     items: [orderItemSchema],
+    itemsSignature: {
+      type: String,
+      required: true,
+      index: true,
+    },
     totalAmount: {
       type: Number,
       required: true,
@@ -37,7 +47,18 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
     paidAt: Date,
-    sepayTransactionId: String,
+    sepayTransactionId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    fulfillmentStatus: {
+      type: String,
+      enum: ["pending", "processing", "completed", "failed"],
+      default: "pending",
+    },
+    fulfilledAt: Date,
+    lastProcessingError: String,
     expiredAt: {
       type: Date,
       required: true,
@@ -46,4 +67,6 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Order", orderSchema);
+orderSchema.index({ userId: 1, status: 1, itemsSignature: 1, totalAmount: 1 });
+
+export default mongoose.models.Order || mongoose.model("Order", orderSchema);

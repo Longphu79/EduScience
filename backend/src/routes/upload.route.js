@@ -1,6 +1,9 @@
 import { Router } from "express";
 import multer from "multer";
-import { authMiddleware } from "../middleware/authMiddleware.js";
+import {
+  authMiddleware,
+  requireRoles,
+} from "../middleware/authMiddleware.js";
 import { avatarUpload, thumbnailUpload, videoUpload } from "../middleware/upload.js";
 import {
   uploadAvatar,
@@ -25,8 +28,8 @@ const handleMulter = (uploadMiddleware) => (req, res, next) => {
 };
 
 router.post("/avatar", authMiddleware, handleMulter(avatarUpload.single("file")), uploadAvatar);
-router.post("/course-thumbnail", authMiddleware, handleMulter(thumbnailUpload.single("file")), uploadCourseThumbnail);
-router.post("/course-preview", authMiddleware, handleMulter(videoUpload.single("file")), uploadCoursePreview);
-router.post("/lesson-video", authMiddleware, handleMulter(videoUpload.single("file")), uploadLessonVideo);
+router.post("/course-thumbnail", authMiddleware, requireRoles("instructor", "admin"), handleMulter(thumbnailUpload.single("file")), uploadCourseThumbnail);
+router.post("/course-preview", authMiddleware, requireRoles("instructor", "admin"), handleMulter(videoUpload.single("file")), uploadCoursePreview);
+router.post("/lesson-video", authMiddleware, requireRoles("instructor", "admin"), handleMulter(videoUpload.single("file")), uploadLessonVideo);
 
 export default router;

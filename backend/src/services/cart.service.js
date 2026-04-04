@@ -1,5 +1,7 @@
 import Cart from "../models/Cart.js";
 import Course from "../models/Course.js";
+import Enrollment from "../models/Enrollment.js";
+import Student from "../models/Student.js";
 import mongoose from "mongoose";
 
 /**
@@ -36,6 +38,18 @@ export const addCourseToCart = async (userId, courseId) => {
 
   if (!course || course.status !== "published") {
     throw new Error("Course not available");
+  }
+
+  const student = await Student.findOne({ userId }).select("_id");
+  if (student) {
+    const existingEnrollment = await Enrollment.findOne({
+      studentId: student._id,
+      courseId,
+    }).select("_id");
+
+    if (existingEnrollment) {
+      throw new Error("Course already enrolled");
+    }
   }
 
   let cart = await Cart.findOne({ user: new mongoose.Types.ObjectId(userId) });
@@ -116,5 +130,5 @@ export const removeCourseFromCart = async (userId, courseId) => {
     throw new Error("Cart not found");
   }
 
-  return cart;
+  return await cart.populate("items.course");
 }

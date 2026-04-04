@@ -1,5 +1,26 @@
 import mongoose from "mongoose";
 
+const lessonResourceSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    url: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    type: {
+      type: String,
+      default: "link",
+      trim: true,
+    },
+  },
+  { _id: false },
+);
+
 const lessonSchema = new mongoose.Schema(
   {
     title: {
@@ -17,9 +38,21 @@ const lessonSchema = new mongoose.Schema(
       required: true, // video bài học
     },
 
+    thumbnail: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     duration: {
       type: Number, // thời lượng (phút hoặc giây)
       default: 0,
+    },
+
+    estimatedCompletionMinutes: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     order: {
@@ -46,6 +79,21 @@ const lessonSchema = new mongoose.Schema(
     isPublished: {
       type: Boolean,
       default: true,
+    },
+
+    objectives: {
+      type: [String],
+      default: [],
+    },
+
+    notes: {
+      type: String,
+      default: "",
+    },
+
+    resources: {
+      type: [lessonResourceSchema],
+      default: [],
     },
   },
   { timestamps: true }
