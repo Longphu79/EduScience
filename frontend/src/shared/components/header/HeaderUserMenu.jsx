@@ -17,7 +17,7 @@ export default function HeaderUserMenu({
     const UserIcon = icons?.user;
     const DashboardIcon = icons?.dashboard;
     const EditIcon = icons?.edit;
-    const AdminIcon = icons?.admin; // Đây là icon cái khiên (Shield)
+    const AdminIcon = icons?.admin;
     const WalletIcon = icons?.wallet;
 
     return (
@@ -102,7 +102,6 @@ export default function HeaderUserMenu({
 
                         <div className="my-1 border-t border-slate-50" />
 
-                        {/* --- STUDENT: NẠP TIỀN (Đã sửa icon thành AdminIcon/Cái khiên) --- */}
                         {isStudent && (
                             <button
                                 type="button"
@@ -121,7 +120,6 @@ export default function HeaderUserMenu({
                             </button>
                         )}
 
-                        {/* --- ADMIN: QUẢN LÝ NẠP TIỀN --- */}
                         {isAdmin && (
                             <button
                                 type="button"
@@ -140,7 +138,24 @@ export default function HeaderUserMenu({
                             </button>
                         )}
 
-                        {/* --- MY WALLET: HIỆN CHO CẢ 3 ROLE --- */}
+                        {isAdmin && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onClose?.();
+                                    onNavigate?.("/admin/withdrawals");
+                                }}
+                                className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                            >
+                                {AdminIcon ? (
+                                    <AdminIcon className="h-4 w-4" />
+                                ) : (
+                                    "🛡️"
+                                )}
+                                Manage Withdrawals
+                            </button>
+                        )}
+
                         <button
                             type="button"
                             onClick={() => {

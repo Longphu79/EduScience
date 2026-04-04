@@ -8,7 +8,7 @@ export { FALLBACK_COURSE_IMAGE, FALLBACK_AVATAR };
 
 export function adminUnwrap(payload) {
     return payload?.data?.data ?? payload?.data ?? payload ?? null;
-}
+}   
 
 export function buildAdminQuery(params = {}) {
     const filtered = Object.fromEntries(

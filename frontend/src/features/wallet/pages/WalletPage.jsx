@@ -1,98 +1,386 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import { io } from "socket.io-client";
 import {
-    DollarSign,
     Landmark,
-    User,
-    ArrowRight,
     Wallet,
     History,
     AlertTriangle,
+    Sparkles,
+    ShieldCheck,
+    CircleDollarSign,
+    CreditCard,
+    BadgeCheck,
 } from "lucide-react";
 import walletService from "../services/wallet.service";
 
+const SOCKET_URL = "http://localhost:4000";
+
+const SUPPORTED_BANKS = [
+    { id: "TPB", name: "TPBank" },
+    { id: "VCB", name: "Vietcombank" },
+    { id: "MB", name: "MBBank" },
+    { id: "TCB", name: "Techcombank" },
+    { id: "ICB", name: "VietinBank" },
+    { id: "ACB", name: "ACB" },
+    { id: "VPB", name: "VPBank" },
+];
+
+function formatCurrencyInput(value) {
+    if (!value) return "";
+    const numeric = String(value).replace(/\D/g, "");
+    if (!numeric) return "";
+    return Number(numeric).toLocaleString("en-US");
+}
+
+function parseCurrencyInput(value) {
+    return Number(String(value || "").replace(/\D/g, "")) || 0;
+}
+
+function sanitizeAccountNumber(value) {
+    return String(value || "").replace(/\D/g, "");
+}
+
+function sanitizeAccountName(value) {
+    return String(value || "")
+        .replace(/[^a-zA-ZÀ-ỹ\s]/g, "")
+        .replace(/\s{2,}/g, " ")
+        .trimStart();
+}
+
+function formatDisplayMoney(value) {
+    return Number(value || 0).toLocaleString("en-US");
+}
+
+function formatDateTime(value) {
+    if (!value) return "--";
+    return new Date(value).toLocaleString();
+}
+
+function CountUpValue({ value = 0 }) {
+    const [displayValue, setDisplayValue] = useState(0);
+    const previousValueRef = useRef(0);
+
+    useEffect(() => {
+        const start = previousValueRef.current;
+        const end = Number(value || 0);
+        const duration = 700;
+        const startTime = performance.now();
+
+        const animate = (now) => {
+            const progress = Math.min((now - startTime) / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const next = Math.round(start + (end - start) * eased);
+            setDisplayValue(next);
+
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            } else {
+                previousValueRef.current = end;
+            }
+        };
+
+        requestAnimationFrame(animate);
+    }, [value]);
+
+    return <>{formatDisplayMoney(displayValue)}</>;
+}
+
 const WalletPage = () => {
     const [wallet, setWallet] = useState(null);
-    const [amount, setAmount] = useState("");
+    const [withdrawals, setWithdrawals] = useState([]);
+    const [amountInput, setAmountInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
+    const [historyLoading, setHistoryLoading] = useState(true);
+    const [otp, setOtp] = useState("");
+    const [otpSent, setOtpSent] = useState(false);
+    const [resendCountdown, setResendCountdown] = useState(0);
     const [bankInfo, setBankInfo] = useState({
-        bankCode: "TPB", // Mặc định là TPB
+        bankCode: "TPB",
         accountNumber: "",
         accountName: "",
     });
-    const navigate = useNavigate();
 
-    const SUPPORTED_BANKS = [
-        { id: "TPB", name: "TPBank" },
-        { id: "VCB", name: "Vietcombank" },
-        { id: "MB", name: "MBBank" },
-        { id: "TCB", name: "Techcombank" },
-        { id: "ICB", name: "VietinBank" },
-        { id: "ACB", name: "ACB" },
-        { id: "VPB", name: "VPBank" },
-    ];
+    const navigate = useNavigate();
+    const socketRef = useRef(null);
+
+    const balance = Number(wallet?.balance || 0);
+    const totalEarned = Number(wallet?.totalEarned || 0);
+    const amountValue = parseCurrencyInput(amountInput);
+
+    const amountError = useMemo(() => {
+        if (!amountInput) return "";
+        if (amountValue < 50000)
+            return "Minimum withdrawal amount is 50,000 VND";
+        if (amountValue > balance)
+            return "Withdrawal amount exceeds your available balance";
+        return "";
+    }, [amountInput, amountValue, balance]);
+
+    const accountNumberError = useMemo(() => {
+        if (!bankInfo.accountNumber) return "";
+        if (bankInfo.accountNumber.length < 6)
+            return "Account number looks too short";
+        return "";
+    }, [bankInfo.accountNumber]);
+
+    const accountNameError = useMemo(() => {
+        if (!bankInfo.accountName) return "";
+        if (bankInfo.accountName.trim().length < 2)
+            return "Account holder name is too short";
+        return "";
+    }, [bankInfo.accountName]);
+
+    const canSendOtp =
+        amountValue >= 50000 &&
+        amountValue <= balance &&
+        Boolean(bankInfo.accountNumber) &&
+        Boolean(bankInfo.accountName) &&
+        !amountError &&
+        !accountNumberError &&
+        !accountNameError;
 
     const loadWallet = async () => {
         try {
             const res = await walletService.getMyWallet();
-            if (res && res.data) {
+            if (res?.data) {
                 setWallet(res.data);
             }
         } catch (error) {
-            console.error("wallet error", error);
             toast.error("Cannot load wallet information. Please try again.");
+        }
+    };
+
+    const loadWithdrawals = async () => {
+        try {
+            setHistoryLoading(true);
+            const res = await walletService.getMyWithdrawals();
+            setWithdrawals(res?.data || []);
+        } catch (error) {
+            toast.error("Cannot load withdrawal history.");
         } finally {
-            setFetching(false);
+            setHistoryLoading(false);
         }
     };
 
     useEffect(() => {
-        loadWallet();
+        const bootstrap = async () => {
+            try {
+                setFetching(true);
+                await Promise.all([loadWallet(), loadWithdrawals()]);
+            } finally {
+                setFetching(false);
+            }
+        };
+
+        bootstrap();
     }, []);
+
+    useEffect(() => {
+        if (resendCountdown <= 0) return;
+
+        const timer = setInterval(() => {
+            setResendCountdown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [resendCountdown]);
+
+    useEffect(() => {
+        const token =
+            localStorage.getItem("accessToken") || localStorage.getItem("token");
+
+        if (!token) return undefined;
+
+        const socket = io(SOCKET_URL, {
+            transports: ["websocket"],
+            auth: {
+                token,
+            },
+        });
+
+        socketRef.current = socket;
+
+        socket.on("connect", () => {
+            console.log("Wallet realtime connected");
+        });
+
+        socket.on("wallet:updated", async (payload) => {
+            if (payload?.wallet) {
+                setWallet(payload.wallet);
+            } else {
+                await loadWallet();
+            }
+
+            if (payload?.withdrawal?._id) {
+                setWithdrawals((prev) => {
+                    const current = Array.isArray(prev) ? prev : [];
+                    const found = current.some(
+                        (item) => item._id === payload.withdrawal._id,
+                    );
+
+                    if (!found) {
+                        return [payload.withdrawal, ...current];
+                    }
+
+                    return current.map((item) =>
+                        item._id === payload.withdrawal._id
+                            ? { ...item, ...payload.withdrawal }
+                            : item,
+                    );
+                });
+            } else {
+                await loadWithdrawals();
+            }
+
+            if (payload?.message) {
+                if (payload?.status === "completed") {
+                    toast.success(payload.message);
+                } else if (payload?.status === "rejected") {
+                    toast.warning(payload.message);
+                } else {
+                    toast.info(payload.message);
+                }
+            } else if (payload?.status === "completed") {
+                toast.success(
+                    "Withdrawal approved. Your wallet has been updated.",
+                );
+            } else if (payload?.status === "rejected") {
+                toast.warning("Withdrawal request was rejected by admin.");
+            }
+        });
+
+        socket.on("disconnect", () => {
+            console.log("Wallet realtime disconnected");
+        });
+
+        return () => {
+            socket.off("wallet:updated");
+            socket.disconnect();
+        };
+    }, []);
+
+    const buildWithdrawBody = () => {
+        const selectedBank = SUPPORTED_BANKS.find(
+            (b) => b.id === bankInfo.bankCode,
+        );
+
+        return {
+            amount: amountValue,
+            bankInfo: {
+                bankCode: bankInfo.bankCode,
+                bankName: selectedBank ? selectedBank.name : "Unknown Bank",
+                accountNumber: bankInfo.accountNumber,
+                accountName: bankInfo.accountName.toUpperCase().trim(),
+            },
+        };
+    };
+
+    const handleAmountChange = (e) => {
+        const raw = e.target.value.replace(/\D/g, "");
+        setAmountInput(formatCurrencyInput(raw));
+    };
+
+    const handleAccountNumberChange = (e) => {
+        setBankInfo((prev) => ({
+            ...prev,
+            accountNumber: sanitizeAccountNumber(e.target.value),
+        }));
+    };
+
+    const handleAccountNameChange = (e) => {
+        setBankInfo((prev) => ({
+            ...prev,
+            accountName: sanitizeAccountName(e.target.value).toUpperCase(),
+        }));
+    };
 
     const handleWithdraw = async (e) => {
         e.preventDefault();
 
-        if (!amount || Number(amount) < 50000) {
-            return toast.warning("Minimum withdrawal amount is 50,000 VND");
-        }
-
-        if (!bankInfo.accountNumber || !bankInfo.accountName) {
-            return toast.warning("Please fill in all bank information");
+        if (!canSendOtp) {
+            return toast.warning(
+                amountError ||
+                    accountNumberError ||
+                    accountNameError ||
+                    "Please complete valid withdrawal information",
+            );
         }
 
         try {
             setLoading(true);
 
-            // Tìm tên ngân hàng đầy đủ dựa trên mã bankCode đã chọn
-            const selectedBank = SUPPORTED_BANKS.find(
-                (b) => b.id === bankInfo.bankCode,
-            );
+            const body = buildWithdrawBody();
+            const res = await walletService.requestWithdrawalOtp(body);
 
-            const body = {
-                amount: Number(amount),
-                bankInfo: {
-                    bankCode: bankInfo.bankCode,
-                    bankName: selectedBank ? selectedBank.name : "Unknown Bank",
-                    accountNumber: bankInfo.accountNumber,
-                    accountName: bankInfo.accountName.toUpperCase(),
-                },
-            };
+            toast.success(res.message || "OTP has been sent to your email");
+            setOtpSent(true);
+            setOtp("");
+            setResendCountdown(res.retryAfter || 60);
+        } catch (error) {
+            const errorMsg =
+                error.response?.data?.message ||
+                error.data?.message ||
+                error.message ||
+                "An error occurred while sending OTP";
 
-            const res = await walletService.createWithdrawalRequest(body);
+            const retryAfter =
+                error.response?.data?.retryAfter || error.data?.retryAfter;
+
+            if (retryAfter) {
+                setResendCountdown(retryAfter);
+            }
+
+            toast.error(errorMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        if (otp.length !== 6) {
+            return toast.warning("Please enter a valid 6-digit OTP");
+        }
+
+        try {
+            setLoading(true);
+
+            const res = await walletService.verifyWithdrawalOtp({ otp });
+            const createdWithdrawal = res?.data || null;
+
             toast.success(
                 res.message || "Withdrawal request submitted successfully!",
             );
 
-            await loadWallet();
-            setAmount("");
+            if (createdWithdrawal?._id) {
+                setWithdrawals((prev) => [createdWithdrawal, ...(prev || [])]);
+            } else {
+                await loadWithdrawals();
+            }
+
+            setAmountInput("");
+            setOtp("");
+            setOtpSent(false);
+            setResendCountdown(0);
+            setBankInfo({
+                bankCode: "TPB",
+                accountNumber: "",
+                accountName: "",
+            });
         } catch (error) {
-            console.error("Lỗi rút tiền:", error);
             const errorMsg =
                 error.response?.data?.message ||
-                "An error occurred while sending the request";
+                error.data?.message ||
+                error.message ||
+                "An error occurred while verifying OTP";
             toast.error(errorMsg);
         } finally {
             setLoading(false);
@@ -103,7 +391,7 @@ const WalletPage = () => {
         return (
             <div className="flex min-h-screen items-center justify-center bg-slate-50">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600"></div>
+                    <div className="h-14 w-14 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
                     <p className="font-medium text-slate-600">
                         Loading your wallet...
                     </p>
@@ -113,256 +401,409 @@ const WalletPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 px-4 py-8 md:px-6 md:py-12">
+        <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.10),_transparent_28%),linear-gradient(to_bottom,_#f8fafc,_#eef2ff_40%,_#f8fafc)] px-4 py-8 md:px-6 md:py-12">
             <div className="mx-auto max-w-7xl">
-                {/* Header Zone */}
                 <div className="mb-10 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
                     <div>
-                        <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 md:text-4xl">
+                        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/80 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-indigo-700 shadow-sm backdrop-blur">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Premium Wallet
+                        </div>
+
+                        <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 md:text-5xl">
                             My Wallet Center
                         </h1>
-                        <p className="mt-1 text-slate-600">
-                            Manage your balance, earnings, and withdrawal
-                            requests securely.
+
+                        <p className="mt-2 max-w-2xl text-slate-600">
+                            Manage your balance, earnings, and withdrawal requests
+                            with a smooth, secure, and modern payout workflow.
                         </p>
                     </div>
+
                     <button
-                        onClick={() => navigate("/transactions")} // 3. Điều hướng đến path bạn đã định nghĩa
-                        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-slate-800 active:scale-95"
+                        onClick={() => navigate("/transactions")}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-800 active:scale-[0.98]"
                     >
                         <History className="h-4 w-4" />
                         View Transaction History
                     </button>
                 </div>
 
-                {/* Main Grid */}
-                <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr,minmax(400px,auto)]">
+                <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1.2fr_0.9fr]">
                     <div className="space-y-8">
-                        {/* Balance Card */}
-                        <div className="relative overflow-hidden rounded-3xl bg-indigo-600 p-8 text-white shadow-2xl shadow-indigo-100">
-                            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-indigo-500 opacity-60"></div>
-                            <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-indigo-700 opacity-50"></div>
+                        <div className="relative overflow-hidden rounded-[32px] border border-white/30 bg-[linear-gradient(135deg,#4f46e5_0%,#5b4df5_28%,#4338ca_70%,#3730a3_100%)] p-8 text-white shadow-[0_30px_80px_rgba(79,70,229,0.28)]">
+                            <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10" />
+                            <div className="absolute right-10 top-10 h-24 w-24 rounded-full border border-white/10 bg-white/5 backdrop-blur-2xl" />
+                            <div className="absolute -left-16 bottom-0 h-52 w-52 rounded-full bg-indigo-900/30 blur-2xl" />
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.14),_transparent_25%)]" />
 
                             <div className="relative z-10">
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-start justify-between gap-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-lg">
-                                            <Wallet className="h-7 w-7 text-indigo-100" />
+                                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl">
+                                            <Wallet className="h-7 w-7 text-indigo-50" />
                                         </div>
-                                        <p className="font-semibold text-indigo-100 uppercase tracking-wide text-sm">
-                                            Available Balance
+
+                                        <div>
+                                            <p className="text-xs font-bold uppercase tracking-[0.22em] text-indigo-100/90">
+                                                Available Balance
+                                            </p>
+                                            <h2 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">
+                                                <CountUpValue value={balance} />
+                                                <span className="ml-2 text-lg font-bold text-indigo-100/90">
+                                                    VND
+                                                </span>
+                                            </h2>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-right backdrop-blur-xl">
+                                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-100/80">
+                                            Lifetime Earned
+                                        </p>
+                                        <p className="mt-1 text-lg font-extrabold">
+                                            {formatDisplayMoney(totalEarned)} VND
                                         </p>
                                     </div>
-                                    <Landmark className="h-6 w-6 text-indigo-200" />
                                 </div>
 
-                                <div className="mt-10 mb-2">
-                                    <p className="text-sm opacity-90">
-                                        Current VND Balance
-                                    </p>
-                                    <p className="text-5xl font-extrabold tracking-tighter md:text-6xl">
-                                        {wallet?.balance?.toLocaleString() || 0}
-                                        <span className="text-3xl font-bold text-indigo-200">
-                                            {" "}
-                                            VND
-                                        </span>
-                                    </p>
-                                </div>
+                                <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
+                                        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+                                            <CircleDollarSign className="h-5 w-5" />
+                                        </div>
+                                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-100/80">
+                                            Current Balance
+                                        </p>
+                                        <p className="mt-2 text-xl font-black">
+                                            {formatDisplayMoney(balance)} VND
+                                        </p>
+                                    </div>
 
-                                <div className="mt-8 flex items-center justify-between border-t border-indigo-500 pt-5 text-sm">
-                                    <p>Safe & Secure Transactions</p>
-                                    <p className="text-xs text-indigo-200">
-                                        Last updated:{" "}
-                                        {new Date(
-                                            wallet?.updatedAt,
-                                        ).toLocaleTimeString()}
-                                    </p>
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
+                                        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+                                            <CreditCard className="h-5 w-5" />
+                                        </div>
+                                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-100/80">
+                                            Minimum Withdraw
+                                        </p>
+                                        <p className="mt-2 text-xl font-black">
+                                            50,000 VND
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-xl">
+                                        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
+                                            <BadgeCheck className="h-5 w-5" />
+                                        </div>
+                                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-100/80">
+                                            Security Layer
+                                        </p>
+                                        <p className="mt-2 text-xl font-black">
+                                            Email OTP
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Secondary Stats */}
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex items-center gap-4">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 text-green-700">
-                                    <DollarSign className="h-6 w-6" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                                        Total Earned
-                                    </p>
-                                    <p className="mt-1 text-2xl font-bold text-slate-950">
-                                        {wallet?.totalEarned?.toLocaleString() ||
-                                            0}{" "}
-                                        <span className="text-lg text-slate-600 text-sm">
-                                            VND
-                                        </span>
-                                    </p>
+                        <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+                            <div className="border-b border-slate-100 px-6 py-5">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                                        <Landmark className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-extrabold text-slate-900">
+                                            Withdrawal Request
+                                        </h3>
+                                        <p className="text-sm text-slate-500">
+                                            Submit payout requests safely with OTP
+                                            verification.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="rounded-2xl bg-white p-6 shadow-sm border border-slate-100 flex items-center gap-4">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                                    <User className="h-6 w-6" />
+
+                            <form
+                                onSubmit={handleWithdraw}
+                                className="space-y-6 px-6 py-6"
+                            >
+                                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                    <div className="md:col-span-2">
+                                        <label className="mb-2 block text-sm font-bold text-slate-700">
+                                            Withdrawal Amount
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={amountInput}
+                                            onChange={handleAmountChange}
+                                            placeholder="Enter amount in VND"
+                                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                                        />
+                                        {amountError ? (
+                                            <p className="mt-2 text-xs font-medium text-rose-500">
+                                                {amountError}
+                                            </p>
+                                        ) : null}
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-bold text-slate-700">
+                                            Bank
+                                        </label>
+                                        <select
+                                            value={bankInfo.bankCode}
+                                            onChange={(e) =>
+                                                setBankInfo((prev) => ({
+                                                    ...prev,
+                                                    bankCode: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                                        >
+                                            {SUPPORTED_BANKS.map((bank) => (
+                                                <option
+                                                    key={bank.id}
+                                                    value={bank.id}
+                                                >
+                                                    {bank.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-bold text-slate-700">
+                                            Account Number
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={bankInfo.accountNumber}
+                                            onChange={handleAccountNumberChange}
+                                            placeholder="Enter bank account number"
+                                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-900 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                                        />
+                                        {accountNumberError ? (
+                                            <p className="mt-2 text-xs font-medium text-rose-500">
+                                                {accountNumberError}
+                                            </p>
+                                        ) : null}
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <label className="mb-2 block text-sm font-bold text-slate-700">
+                                            Account Holder Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={bankInfo.accountName}
+                                            onChange={handleAccountNameChange}
+                                            placeholder="Enter account holder name"
+                                            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold uppercase text-slate-900 outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                                        />
+                                        {accountNameError ? (
+                                            <p className="mt-2 text-xs font-medium text-rose-500">
+                                                {accountNameError}
+                                            </p>
+                                        ) : null}
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                                        User Model
-                                    </p>
-                                    <p className="mt-1 text-2xl font-bold text-slate-950">
-                                        {wallet?.userModel || "Instructor"}
-                                    </p>
-                                </div>
-                            </div>
+
+                                {!otpSent ? (
+                                    <button
+                                        type="submit"
+                                        disabled={loading || !canSendOtp}
+                                        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        <ShieldCheck className="h-4 w-4" />
+                                        {loading ? "Sending OTP..." : "Send OTP"}
+                                    </button>
+                                ) : (
+                                    <div className="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                                        <div className="flex items-start gap-3">
+                                            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-500" />
+                                            <div>
+                                                <p className="font-bold text-amber-900">
+                                                    Enter OTP Verification
+                                                </p>
+                                                <p className="mt-1 text-sm text-amber-700">
+                                                    We sent a 6-digit OTP to your
+                                                    email. Please verify to submit
+                                                    your withdrawal request.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <input
+                                            type="text"
+                                            value={otp}
+                                            onChange={(e) =>
+                                                setOtp(
+                                                    e.target.value
+                                                        .replace(/\D/g, "")
+                                                        .slice(0, 6),
+                                                )
+                                            }
+                                            placeholder="Enter 6-digit OTP"
+                                            className="w-full rounded-2xl border border-amber-200 bg-white px-4 py-3 text-center text-lg font-extrabold tracking-[0.35em] text-slate-900 outline-none transition focus:ring-4 focus:ring-amber-100"
+                                        />
+
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleVerifyOtp}
+                                                disabled={loading || otp.length !== 6}
+                                                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-100 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {loading
+                                                    ? "Verifying..."
+                                                    : "Verify & Submit"}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={handleWithdraw}
+                                                disabled={loading || resendCountdown > 0}
+                                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {resendCountdown > 0
+                                                    ? `Resend in ${resendCountdown}s`
+                                                    : "Resend OTP"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </form>
                         </div>
                     </div>
 
-                    {/* Withdrawal Form */}
-                    <div className="rounded-3xl bg-white p-8 shadow-sm border border-slate-100 self-start">
-                        <div className="flex items-center gap-4 border-b border-slate-100 pb-6 mb-8">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-100">
-                                <Landmark className="h-7 w-7" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-slate-950">
-                                    Withdraw Funds
-                                </h3>
-                                <p className="text-sm text-slate-600">
-                                    Choose your bank and enter details.
-                                </p>
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleWithdraw} className="space-y-6">
-                            {/* Input: Amount */}
-                            <div className="relative">
-                                <label className="block text-sm font-semibold text-slate-900 mb-1.5">
-                                    Withdrawal Amount
-                                </label>
-                                <div className="relative">
-                                    <DollarSign className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        className="w-full rounded-xl border border-slate-200 bg-white p-4 pl-12 pr-16 text-lg font-bold text-slate-950 focus:border-indigo-400 focus:ring-indigo-200 focus:ring-2 transition shadow-sm"
-                                        value={amount}
-                                        onChange={(e) =>
-                                            setAmount(
-                                                e.target.value.replace(
-                                                    /\D/g,
-                                                    "",
-                                                ),
-                                            )
-                                        }
-                                        placeholder="Min: 50,000"
-                                        required
-                                    />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-slate-400 select-none">
-                                        VND
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Bank Selection & Details */}
-                            <div className="space-y-5 rounded-2xl bg-slate-50 p-5 border border-slate-100 relative pt-7">
-                                <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider absolute -top-2.5 left-5 bg-white px-2">
-                                    Receiving Account
-                                </p>
-
-                                {/* Select Bank */}
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                        Select Bank
-                                    </label>
-                                    <select
-                                        className="w-full rounded-lg border border-slate-200 bg-white p-3 font-semibold text-slate-950 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300 outline-none cursor-pointer"
-                                        value={bankInfo.bankCode}
-                                        onChange={(e) =>
-                                            setBankInfo({
-                                                ...bankInfo,
-                                                bankCode: e.target.value,
-                                            })
-                                        }
-                                        required
-                                    >
-                                        {SUPPORTED_BANKS.map((bank) => (
-                                            <option
-                                                key={bank.id}
-                                                value={bank.id}
-                                            >
-                                                {bank.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                        Account Number
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className="w-full rounded-lg border border-slate-200 bg-white p-3 font-mono text-slate-950 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300"
-                                        value={bankInfo.accountNumber}
-                                        onChange={(e) =>
-                                            setBankInfo({
-                                                ...bankInfo,
-                                                accountNumber: e.target.value,
-                                            })
-                                        }
-                                        placeholder="Enter account number"
-                                        required
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                                        Account Holder Name
-                                    </label>
-                                    <div className="relative">
-                                        <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            className="w-full rounded-lg border border-slate-200 bg-white p-3 pl-9 font-semibold text-slate-950 uppercase focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300"
-                                            value={bankInfo.accountName}
-                                            onChange={(e) =>
-                                                setBankInfo({
-                                                    ...bankInfo,
-                                                    accountName: e.target.value,
-                                                })
-                                            }
-                                            placeholder="NGUYEN VAN A"
-                                            required
-                                        />
+                    <div className="space-y-8">
+                        <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+                            <div className="border-b border-slate-100 px-6 py-5">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                                        <History className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-extrabold text-slate-900">
+                                            Withdrawal History
+                                        </h3>
+                                        <p className="text-sm text-slate-500">
+                                            Track every payout request and admin
+                                            response.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-800 border border-amber-100">
-                                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                                <p>
-                                    Ensure all details match your bank record to
-                                    avoid transaction failures.
-                                </p>
-                            </div>
+                            <div className="max-h-[680px] overflow-y-auto px-6 py-5">
+                                {historyLoading ? (
+                                    <div className="py-8 text-center text-sm text-slate-400">
+                                        Loading withdrawal history...
+                                    </div>
+                                ) : withdrawals.length === 0 ? (
+                                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
+                                        <p className="font-semibold text-slate-700">
+                                            No withdrawal requests yet
+                                        </p>
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            Your latest withdrawal requests will
+                                            appear here.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {withdrawals.map((item) => {
+                                            const isPending =
+                                                item.status === "pending";
+                                            const isCompleted =
+                                                item.status === "completed";
+                                            const isRejected =
+                                                item.status === "rejected";
 
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="group relative w-full overflow-hidden rounded-2xl bg-indigo-600 px-6 py-4 text-center font-bold text-white shadow-xl transition-all hover:bg-indigo-700 disabled:opacity-60"
-                            >
-                                <div
-                                    className={`flex items-center justify-center gap-2 ${loading ? "opacity-0" : "opacity-100"}`}
-                                >
-                                    <span>Submit Withdrawal Request</span>
-                                    <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-                                </div>
-                                {loading && (
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white"></div>
+                                            return (
+                                                <div
+                                                    key={item._id}
+                                                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                                                >
+                                                    <div className="flex items-start justify-between gap-4">
+                                                        <div>
+                                                            <div className="text-lg font-extrabold text-slate-900">
+                                                                {formatDisplayMoney(
+                                                                    item.amount,
+                                                                )}{" "}
+                                                                VND
+                                                            </div>
+                                                            <div className="mt-1 text-sm text-slate-500">
+                                                                {item.bankInfo?.bankName}{" "}
+                                                                -{" "}
+                                                                {
+                                                                    item.bankInfo
+                                                                        ?.accountNumber
+                                                                }
+                                                            </div>
+                                                        </div>
+
+                                                        <span
+                                                            className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${
+                                                                isPending
+                                                                    ? "bg-amber-100 text-amber-700"
+                                                                    : isCompleted
+                                                                      ? "bg-emerald-100 text-emerald-700"
+                                                                      : "bg-rose-100 text-rose-700"
+                                                            }`}
+                                                        >
+                                                            {item.status}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-slate-600">
+                                                        <div>
+                                                            <span className="font-semibold text-slate-800">
+                                                                Created:
+                                                            </span>{" "}
+                                                            {formatDateTime(
+                                                                item.createdAt,
+                                                            )}
+                                                        </div>
+
+                                                        <div>
+                                                            <span className="font-semibold text-slate-800">
+                                                                Processed:
+                                                            </span>{" "}
+                                                            {formatDateTime(
+                                                                item.processedAt,
+                                                            )}
+                                                        </div>
+
+                                                        {isRejected &&
+                                                        item.adminNote ? (
+                                                            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-700">
+                                                                <span className="font-bold">
+                                                                    Reject reason:
+                                                                </span>{" "}
+                                                                {item.adminNote}
+                                                            </div>
+                                                        ) : null}
+
+                                                        {isCompleted &&
+                                                        item.adminNote ? (
+                                                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-emerald-700">
+                                                                <span className="font-bold">
+                                                                    Admin note:
+                                                                </span>{" "}
+                                                                {item.adminNote}
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
-                            </button>
-                        </form>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
