@@ -2,6 +2,10 @@ import mongoose from "mongoose";
 import * as adminService from "./admin.service.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import * as walletService from "../wallet/wallet.service.js";
+import {
+    emitWalletUpdated,
+    emitWithdrawalUpdatedToAdmins,
+} from "../chat/chat.socket.js";
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -395,13 +399,17 @@ export const getWithdrawalRequests = async (req, res) => {
             limit,
             status,
         });
-        res.status(200).json({
-            sucess: true,
+
+        return res.status(200).json({
+            success: true,
             data: data.items,
             pagination: data.pagination,
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
     }
 };
 
@@ -410,32 +418,50 @@ export const processWithdrawal = async (req, res) => {
         const { withdrawalId } = req.params;
         const { status, adminNote } = req.body;
 
-        // TRUYỀN THAM SỐ RỜI THEO SERVICE
         const result = await adminService.processWithdrawal(
             withdrawalId,
             status,
             adminNote,
         );
 
-        // LỖI CÚ PHÁP: res.status.json là sai -> res.status(200).json
+        emitWalletUpdated(result.userId, {
+            type: "withdrawal_processed",
+            status: result.withdrawal.status,
+            message:
+                result.withdrawal.status === "completed"
+                    ? "Your withdrawal has been approved and your wallet balance was updated."
+                    : "Your withdrawal request was rejected by admin.",
+            wallet: result.wallet,
+            withdrawal: result.withdrawal,
+        });
+
+        emitWithdrawalUpdatedToAdmins({
+            withdrawal: result.withdrawal,
+            message:
+                result.withdrawal.status === "completed"
+                    ? "Một yêu cầu rút tiền đã được duyệt."
+                    : "Một yêu cầu rút tiền đã bị từ chối.",
+        });
+
         return res.status(200).json({
             success: true,
             message:
                 status === "completed"
                     ? "Đã xác nhận thanh toán"
                     : "Đã từ chối yêu cầu",
-            data: result,
+            data: result.withdrawal,
         });
     } catch (error) {
-        res.status(400).json({ success: false, message: error.message });
+        return res.status(400).json({
+            success: false,
+            message: error.message,
+        });
     }
 };
 
 export const handleApproveDeposit = async (req, res) => {
     try {
         const { depositId } = req.params;
-
-        // Gọi hàm approveDeposit từ walletService đã viết ở bước trước
         const result = await walletService.approveDeposit(depositId);
 
         return sendSuccess(res, {

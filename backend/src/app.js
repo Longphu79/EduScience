@@ -29,12 +29,13 @@ import { sendSuccess } from "./utils/response.js";
 
 const app = express();
 
-const allowedOrigins = (
-    process.env.FRONTEND_URL ||
-    "http://localhost:5173" ||
-    "https://eduscience.id.vn"
-)
-    .split(",")
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    "http://localhost:5173",
+    "https://eduscience.id.vn",
+]
+    .filter(Boolean)
+    .flatMap((item) => item.split(","))
     .map((item) => item.trim())
     .filter(Boolean);
 

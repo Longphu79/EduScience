@@ -4,7 +4,7 @@ const withdrawalSchema = new mongoose.Schema(
     {
         userId: {
             type: mongoose.Schema.Types.ObjectId,
-            refPath: "User",
+            ref: "User",
             required: true,
         },
         userModel: {
@@ -25,6 +25,7 @@ const withdrawalSchema = new mongoose.Schema(
             accountName: String,
         },
         adminNote: { type: String, default: "" },
+        processedAt: { type: Date, default: null },
     },
     { timestamps: true },
 );

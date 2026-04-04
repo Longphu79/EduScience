@@ -10,6 +10,8 @@ import {
 } from "./chat.service.js";
 import ChatConversation from "./chatConversation.model.js";
 
+let ioInstance = null;
+
 function extractSocketToken(socket) {
   const authToken = socket.handshake?.auth?.token;
   if (authToken) return authToken;
@@ -29,11 +31,37 @@ function getSocketUserId(user) {
   return user?._id || user?.userId || user?.id || null;
 }
 
+function getRoleRoom(role) {
+  return `role:${String(role || "").toLowerCase()}`;
+}
+
 async function buildConversationPayload(conversationId) {
   return ChatConversation.findById(conversationId)
     .populate("studentId", "username email fullName name avatarUrl")
     .populate("instructorId", "username email fullName name avatarUrl")
     .populate("courseId", "title thumbnail");
+}
+
+export function emitToUserRoom(userId, eventName, payload = {}) {
+  if (!ioInstance || !userId || !eventName) return;
+  ioInstance.to(getUserRoom(userId)).emit(eventName, payload);
+}
+
+export function emitToRoleRoom(role, eventName, payload = {}) {
+  if (!ioInstance || !role || !eventName) return;
+  ioInstance.to(getRoleRoom(role)).emit(eventName, payload);
+}
+
+export function emitWalletUpdated(userId, payload = {}) {
+  emitToUserRoom(userId, "wallet:updated", payload);
+}
+
+export function emitWithdrawalCreatedToAdmins(payload = {}) {
+  emitToRoleRoom("admin", "withdrawal:created", payload);
+}
+
+export function emitWithdrawalUpdatedToAdmins(payload = {}) {
+  emitToRoleRoom("admin", "withdrawal:updated", payload);
 }
 
 export function initChatSocket(server) {
@@ -43,6 +71,8 @@ export function initChatSocket(server) {
       credentials: true,
     },
   });
+
+  ioInstance = io;
 
   io.use((socket, next) => {
     try {
@@ -61,9 +91,14 @@ export function initChatSocket(server) {
 
   io.on("connection", (socket) => {
     const currentUserId = getSocketUserId(socket.user);
+    const currentUserRole = String(socket.user?.role || "").toLowerCase();
 
     if (currentUserId) {
       socket.join(getUserRoom(currentUserId));
+    }
+
+    if (currentUserRole) {
+      socket.join(getRoleRoom(currentUserRole));
     }
 
     socket.on("chat:join", async ({ conversationId }) => {

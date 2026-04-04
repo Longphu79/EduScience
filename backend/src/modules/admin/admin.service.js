@@ -489,7 +489,7 @@ export const getWithdrawalRequests = async ({
 
     const itemsWithDetails = items.map((item) => {
       const user = item.userId;
-      const displayName = user?.fullName || user?.username || "N/A";
+const displayName = user?.fullName || user?.name || user?.username || "N/A";
       const displayEmail = user?.email || "N/A";
       const displayAvatar =
         user?.avatarUrl ||
@@ -545,55 +545,57 @@ export const processWithdrawal = async (
   const userObjectId = new mongoose.Types.ObjectId(withdrawal.userId);
 
   if (status === "rejected") {
-    const updatedWallet = await Wallet.findOneAndUpdate(
-      { userId: withdrawal.userId },
-      { $inc: { balance: withdrawal.amount } },
-      { new: true },
-    );
-
-    await transactionService.createTransaction({
-      userId: userObjectId,
-      amount: withdrawal.amount,
-      type: "refund",
-      status: "completed",
-      description: `Hoàn tiền rút #${withdrawal._id.toString().substring(0, 8)}: ${adminNote}`,
-      balanceBefore: wallet.balance,
-      balanceAfter: updatedWallet.balance,
-      referenceId: withdrawal._id,
-      referenceModel: "Withdrawal",
-    });
-
     withdrawal.status = "rejected";
     withdrawal.adminNote = adminNote;
-  } else {
-    await transactionService.createTransaction({
-      userId: userObjectId,
-      amount: -withdrawal.amount,
-      type: "withdrawal",
-      status: "completed",
-      description: `Rút tiền về tài khoản ${withdrawal.bankInfo?.bankCode}`,
-      balanceBefore: wallet.balance + withdrawal.amount,
-      balanceAfter: wallet.balance,
-      referenceId: withdrawal._id,
-      referenceModel: "Withdrawal",
-    });
-
-    withdrawal.status = "completed";
     withdrawal.processedAt = new Date();
+
+    await withdrawal.save();
+
+    return {
+      userId: String(withdrawal.userId),
+      wallet: wallet.toObject(),
+      withdrawal: withdrawal.toObject(),
+    };
   }
 
+  if (wallet.balance < withdrawal.amount) {
+    throw new Error("Số dư ví không đủ để duyệt lệnh rút");
+  }
+
+  const balanceBefore = wallet.balance;
+  wallet.balance -= withdrawal.amount;
+  await wallet.save();
+
+  await transactionService.createTransaction({
+    userId: userObjectId,
+    amount: -withdrawal.amount,
+    type: "withdrawal",
+    status: "completed",
+    description: `Rút tiền về tài khoản ${withdrawal.bankInfo?.bankCode}`,
+    balanceBefore,
+    balanceAfter: wallet.balance,
+    referenceId: withdrawal._id,
+    referenceModel: "Withdrawal",
+  });
+
+  withdrawal.status = "completed";
+  withdrawal.adminNote = adminNote;
+  withdrawal.processedAt = new Date();
+
   await withdrawal.save();
-  return withdrawal;
+
+  return {
+    userId: String(withdrawal.userId),
+    wallet: wallet.toObject(),
+    withdrawal: withdrawal.toObject(),
+  };
 };
 
 export const getDashboardAnalytics = async ({ from, to } = {}) => {
   const createdAtRange = normalizeDateRange({ from, to });
 
-  // Giữ danh sách course đầy đủ để analytics instructor/category
-  // không bị rỗng chỉ vì course được tạo ngoài khoảng ngày lọc.
   const courseQuery = { instructorId: { $ne: null } };
 
-  // Chỉ áp filter ngày cho dữ liệu event/time-based.
   const enrollmentQuery = createdAtRange ? { createdAt: createdAtRange } : {};
   const userQuery = createdAtRange ? { createdAt: createdAtRange } : {};
   const reviewQuery = createdAtRange ? { createdAt: createdAtRange } : {};
@@ -873,7 +875,7 @@ export const getDashboardCsv = async ({ from, to } = {}) => {
   ];
 
   return `\uFEFF${toCsv(rows)}`;
-};
+}
 
 function sortLeaderboardItems(items = [], sortBy = "students") {
   const safeSortBy = String(sortBy || "students");
@@ -922,8 +924,6 @@ export const getInstructorLeaderboard = async ({
 } = {}) => {
   const safeLimit = Math.max(1, Math.min(Number(limit) || 10, 100));
 
-  // Không filter course theo createdAt để instructor cũ vẫn lên leaderboard
-  // nếu có enrollments/reviews/quiz trong khoảng lọc.
   const courseQuery = { instructorId: { $ne: null } };
 
   const courses = await Course.find(courseQuery)
@@ -977,7 +977,6 @@ export const getInstructorLeaderboard = async ({
   ]);
 
   const courseMap = new Map(courses.map((course) => [String(course._id), course]));
-
   const instructorMap = new Map();
 
   courses.forEach((course) => {
